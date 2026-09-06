@@ -3,8 +3,8 @@ import { dirname, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const outputDirectory = resolve(process.argv[2] ?? join(repositoryRoot, "docs"));
-const hostingBasePath = "/taskloom-swift";
+const outputDirectory = resolve(process.argv[2] ?? join(repositoryRoot, ".build/site"));
+const hostingBasePath = "/docs/taskloom-swift";
 const attributePattern = /\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
 
 const htmlFiles = [];

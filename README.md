@@ -81,7 +81,9 @@ make site-build
 make site-preview
 ```
 
-The local preview serves `/taskloom-swift/`. The site builds from the current checkout; it does not require a published release. `make documentation` creates `.build/documentation/TaskLoom-Documentation.zip` for opening in Xcode or attaching to a release.
+The [central documentation repository](https://github.com/modern-swift-dev/docs) builds and publishes the [TaskLoom site](https://modern-swift-dev.github.io/docs/taskloom-swift/) from `main` daily and on manual runs. Local builds write ignored output to `.build/site/`; documentation sources remain here.
+
+The local preview serves `/docs/taskloom-swift/`. The site builds from the current checkout; it does not require a published release. `make documentation` creates `.build/documentation/TaskLoom-Documentation.zip` for opening in Xcode or attaching to a release.
 
 The inherited `Publisher.single()` helper currently only reliably supports synchronous emission; it does not safely manage a long-lived subscription, empty completion, or task cancellation. Prefer another bridge for asynchronous publishers until that API is revised.
 

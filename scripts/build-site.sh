@@ -6,7 +6,7 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 website_directory="$repository_root/Website"
 astro_output_directory="$website_directory/dist"
 build_directory="$repository_root/.build"
-published_directory="$repository_root/docs"
+published_directory="$build_directory/site"
 
 mkdir -p "$build_directory"
 staging_directory="$(mktemp -d "$build_directory/site.XXXXXX")"

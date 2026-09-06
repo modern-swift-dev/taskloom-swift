@@ -3,9 +3,9 @@ import { access, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, relative, resolve, sep } from "node:path";
 
-const siteDirectory = resolve(process.argv[2] ?? "docs");
+const siteDirectory = resolve(process.argv[2] ?? ".build/site");
 const port = Number.parseInt(process.argv[3] ?? "4321", 10);
-const hostingBasePath = "/taskloom-swift";
+const hostingBasePath = "/docs/taskloom-swift";
 
 if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error("The preview port must be an integer between 1 and 65535.");

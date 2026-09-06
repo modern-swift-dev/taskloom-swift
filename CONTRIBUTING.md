@@ -26,9 +26,9 @@ make site-preview
 make documentation
 ```
 
-`make site-build` builds Astro, generates static DocC under `api/taskloom`, and checks internal links before replacing `docs`. It needs Swift, the DocC plugin, Node.js, and installed website dependencies. `make documentation` uses the DocC plugin to create a zipped TaskLoom archive for release automation. Run documentation builds on macOS with Xcode selected to include the Apple-only APIs.
+`make site-build` builds Astro, generates static DocC under `api/taskloom`, and checks internal links before replacing `.build/site`. It needs Swift, the DocC plugin, Node.js, and installed website dependencies. `make documentation` uses the DocC plugin to create a zipped TaskLoom archive for release automation. Run documentation builds on macOS with Xcode selected to include the Apple-only APIs.
 
-Do not commit `.build`, `Website/node_modules`, or `Website/dist`. The documentation workflow commits generated `docs` to the main branch. Configure GitHub Pages to deploy from the `main` branch's `/docs` directory. Edit documentation sources rather than generated pages. No release API lookup is necessary to build the website.
+Do not commit `.build`, `Website/node_modules`, or `Website/dist`. The [central documentation repository](https://github.com/modern-swift-dev/docs) builds from `main` daily and publishes at https://modern-swift-dev.github.io/docs/taskloom-swift/. Edit documentation sources here; generated pages are deployed as artifacts. No release API lookup is necessary to build the website.
 
 ## Pull requests
 

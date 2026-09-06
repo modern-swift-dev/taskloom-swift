@@ -6,3 +6,6 @@ xcuserdata/
 Website/node_modules/
 Website/dist/
 Website/.astro/
+
+# Legacy generated documentation
+/docs/

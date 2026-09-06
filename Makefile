@@ -46,7 +46,7 @@ site-build:
 	bash scripts/build-site.sh
 
 site-check:
-	node Website/scripts/check-internal-links.mjs docs
+	node Website/scripts/check-internal-links.mjs .build/site
 
 site-preview:
-	node scripts/preview-site.mjs docs
+	node scripts/preview-site.mjs .build/site
