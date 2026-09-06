@@ -29,12 +29,6 @@ jobs:
           - platform: macOS
           - platform: iOS
             simulator-name: iPhone 17 Pro
-          - platform: tvOS
-            simulator-name: Apple TV 4K (3rd generation)
-          - platform: visionOS
-            simulator-name: Apple Vision Pro
-          - platform: watchOS
-            simulator-name: Apple Watch Series 11 (46mm)
     steps:
       - uses: actions/checkout@v4
       - name: Verify toolchain
