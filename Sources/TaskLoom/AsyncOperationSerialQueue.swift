@@ -1,4 +1,3 @@
-import AsyncAlgorithms
 import Foundation
 import Logging
 import Synchronization
@@ -6,13 +5,15 @@ import Synchronization
 import Combine
 #endif
 
-/// A Async-Await Serial Queue backed by an AsyncChannel.
+/// An async-await serial queue backed by an AsyncStream.
 /// This class provides a mechanism to execute asynchronous operations serially, ensuring that
-/// only one operation runs at a time. It also offers cancellation capabilities and tracks progress.
+/// only one operation runs at a time, in submission order. It also offers cancellation capabilities and tracks progress.
+/// Submissions are buffered before the enqueue method returns. Concurrent callers are ordered
+/// by acquisition of the queue's state lock.
 ///
 /// Thread Safety: Marked `@unchecked Sendable` because:
 /// - `name` is immutable (`let`)
-/// - `channel` (AsyncChannel) is internally thread-safe
+/// - `continuation` (AsyncStream.Continuation) is internally thread-safe
 /// - `progress` is an immutable reference to Foundation's thread-safe `Progress`
 /// - `state` uses `Mutex` for the consumer task, cancellation and flush continuations
 public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
@@ -130,8 +131,8 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
     /// The name of the queue.
     private let name: String
 
-    /// The backing `AsyncChannel` that manages the serial execution of tasks.
-    private let channel: AsyncChannel<SerialTask> = .init()
+    /// The continuation synchronously buffers submissions for the single consumer.
+    private let continuation: AsyncStream<SerialTask>.Continuation
 
     /// Protected queue state used across progress cancellation, explicit cancellation, and flushing.
     private let state = Mutex(State())
@@ -180,9 +181,11 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
     public init(name: String, priority: TaskPriority = .medium, applyTestRestriction: Bool = true) {
         self.name = name
 
-        let channel = self.channel
+        let (stream, continuation) = AsyncStream<SerialTask>.makeStream()
+        self.continuation = continuation
         let task = Task(priority: priority) { [weak self] in
-            for await operation in channel where !Task.isCancelled {
+            for await operation in stream {
+                guard !Task.isCancelled else { break }
                 await operation.execute()
                 guard let self else {
                     return
@@ -202,7 +205,7 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
     /// Deinitializes the queue, ensuring any pending tasks are cancelled.
     deinit {
         state.withLock { $0.task }?.cancel()
-        channel.finish()
+        continuation.finish()
     }
 
     /// Enqueues a non-cancellable Main Actor operation to be executed serially.
@@ -217,23 +220,11 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
         _ line: UInt = #line,
         _ uiOperation: @escaping @MainActor @Sendable () async -> Void
     ) async {
-        guard !isCancelled else {
-            return
-        }
-
-        let task = SerialTask(owner: name, file: "\(file)", functionName: functionName, line: line, task: uiOperation)
-        task.debug(msg: "Queued", outputTime: false)
-        await channel.send(task)
-
-        Task { @MainActor in
-            if progress.totalUnitCount < .max {
-                progress.totalUnitCount += 1
-            }
-        }
+        submit(file, functionName, line, uiOperation)
     }
 
     /// Enqueues a non-cancellable Main Actor operation to be executed serially.
-    /// This is an asynchronous version that returns immediately.
+    /// The operation is buffered synchronously and this method returns immediately.
     /// - Parameters:
     ///   - file: The file where this method is called. Defaults to `#file`.
     ///   - functionName: The function where this method is called. Defaults to `#function`.
@@ -245,12 +236,7 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
         _ line: UInt = #line,
         _ uiOperation: @escaping @MainActor @Sendable () async -> Void
     ) {
-        guard !isCancelled else {
-            return
-        }
-        Task { [weak self] in
-            await self?.enqueue(file, functionName, line, uiOperation)
-        }
+        submit(file, functionName, line, uiOperation)
     }
 
     /// Enqueues a cancellable Main Actor operation to be executed serially.
@@ -266,24 +252,12 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
         _ line: UInt = #line,
         _ uiOperation: @escaping @MainActor @Sendable () async -> Void
     ) async -> AnyCancellable {
-        guard !isCancelled else {
-            return AnyCancellable {}
-        }
-
-        let task = SerialTask(owner: name, file: "\(file)", functionName: functionName, line: line, task: uiOperation)
-        task.debug(msg: "Queued", outputTime: false)
-        await channel.send(task)
-
-        Task { @MainActor in
-            if progress.totalUnitCount < .max {
-                progress.totalUnitCount += 1
-            }
-        }
+        let task = submit(file, functionName, line, uiOperation)
         return AnyCancellable { [weak task] in task?.cancel() }
     }
 
     /// Enqueues a cancellable Main Actor operation to be executed serially.
-    /// This is an asynchronous version that returns an `AnyCancellable` token immediately.
+    /// The operation is buffered synchronously and an `AnyCancellable` token is returned immediately.
     /// - Parameters:
     ///   - file: The file where this method is called. Defaults to `#file`.
     ///   - functionName: The function where this method is called. Defaults to `#function`.
@@ -296,29 +270,28 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
         _ line: UInt = #line,
         _ uiOperation: @escaping @MainActor @Sendable () async -> Void
     ) -> AnyCancellable {
-        guard !isCancelled else {
-            return AnyCancellable {}
-        }
-
-        let task = SerialTask(owner: name, file: "\(file)", functionName: functionName, line: line, task: uiOperation)
-        task.debug(msg: "Queued", outputTime: false)
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-            await self.channel.send(task)
-
-            Task { @MainActor [weak self] in
-                guard let self else {
-                    return
-                }
-
-                if self.progress.totalUnitCount < .max {
-                    self.progress.totalUnitCount += 1
-                }
-            }
-        }
+        let task = submit(file, functionName, line, uiOperation)
         return AnyCancellable { [weak task] in task?.cancel() }
+    }
+
+    @discardableResult
+    private func submit(
+        _ file: String,
+        _ functionName: String,
+        _ line: UInt,
+        _ operation: @escaping @MainActor @Sendable () async -> Void
+    ) -> SerialTask? {
+        guard !progress.isCancelled else { return nil }
+        let task = SerialTask(owner: name, file: file, functionName: functionName, line: line, task: operation)
+        return state.withLock { state in
+            guard !state.isCancelled else { return nil }
+            task.debug(msg: "Queued", outputTime: false)
+            if progress.totalUnitCount < .max {
+                progress.totalUnitCount += 1
+            }
+            continuation.yield(task)
+            return task
+        }
     }
 
     /// Waits for all currently enqueued operations to complete.
@@ -344,14 +317,12 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
                 return
             }
 
-            Task { [weak self] in
-                guard let self else {
-                    return
-                }
-
-                await self.enqueue {
-                    self.resumeFlush(id: id)
-                }
+            submit(#file, #function, #line) { [weak self] in
+                self?.resumeFlush(id: id)
+            }
+            // Progress cancellation can reject the sentinel before its handler runs.
+            if isCancelled {
+                resumeFlush(id: id)
             }
         }
     }
@@ -390,7 +361,7 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
         flushWaiters.forEach { $0.continuation.resume() }
 
         task?.cancel()
-        channel.finish()
+        continuation.finish()
     }
 
     /// Stores the queue's cancellation handler in a `Set<AnyCancellable>`, allowing external cancellation management.

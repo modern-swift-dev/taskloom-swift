@@ -135,6 +135,39 @@ private typealias SerialQueueOperation = @MainActor @Sendable () async -> Void
         #expect(order == [1, 2, 3, 4, 5])
     }
 
+    @Test @MainActor func publicSubmissionsPreserveOrderBeforeImmediateFlush() async {
+        let queue = AsyncOperationSerialQueue(name: "Public FIFO")
+        defer { queue.cancel() }
+        let enqueue: (String, String, UInt, @escaping SerialQueueOperation) -> Void = queue.enqueue
+        let enqueueCancellable: (String, String, UInt, @escaping SerialQueueOperation) -> AnyCancellable = queue.enqueueCancellable
+        var tokens: [AnyCancellable] = []
+        var order: [Int] = []
+        var activeCount = 0
+        var maxActiveCount = 0
+
+        for id in 0..<100 {
+            let operation: SerialQueueOperation = {
+                activeCount += 1
+                maxActiveCount = max(maxActiveCount, activeCount)
+                await Task.yield()
+                order.append(id)
+                activeCount -= 1
+            }
+            if id.isMultiple(of: 2) {
+                enqueue(#file, #function, #line, operation)
+            } else {
+                tokens.append(enqueueCancellable(#file, #function, #line, operation))
+            }
+        }
+
+        // Acceptance must finish before returning to the caller, without an actor hop.
+        #expect(queue.totalTaskCount == 100)
+        await queue.flush()
+        #expect(order == Array(0..<100))
+        #expect(maxActiveCount == 1)
+        withExtendedLifetime(tokens) {}
+    }
+
     @Test func queueMaintainsFIFOOrder() async {
         let queue = AsyncOperationSerialQueue(name: "FIFO")
         let tracker = SerialQueueTracker()
