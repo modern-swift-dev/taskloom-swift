@@ -441,8 +441,9 @@ private typealias SerialQueueOperation = @MainActor @Sendable () async -> Void
 
     // MARK: - Refresh Count
 
-    @Test @MainActor func refreshCountResetsProgress() async {
+    @Test @MainActor func refreshCountResetsProgress() async throws {
         let queue = AsyncOperationSerialQueue(name: "Refresh")
+        defer { queue.cancel() }
 
         await queue.enqueue {
             try? await Task.sleep(for: .milliseconds(10))
@@ -451,10 +452,13 @@ private typealias SerialQueueOperation = @MainActor @Sendable () async -> Void
             try? await Task.sleep(for: .milliseconds(10))
         }
 
-        // Wait for completion (use sleep since flush adds a sentinel task to progress)
-        try? await Task.sleep(for: .milliseconds(100))
+        // Wait for the actual count; flush would add a sentinel task to progress.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        while queue.completedTaskCount < 2, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(1))
+        }
 
-        #expect(queue.completedTaskCount == 2)
+        try #require(queue.completedTaskCount == 2)
         #expect(queue.totalTaskCount == 2)
 
         // Refresh count (now @MainActor)
