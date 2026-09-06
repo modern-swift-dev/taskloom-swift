@@ -41,7 +41,12 @@ public extension Collection where Element: Sendable {
             }
             try Task.checkCancellation()
             // Every scheduled element has completed successfully at this point.
-            return results.map { $0! }
+            return results.map { result in
+                guard let result else {
+                    preconditionFailure("Every scheduled element must have a result")
+                }
+                return result
+            }
         }
     }
 }

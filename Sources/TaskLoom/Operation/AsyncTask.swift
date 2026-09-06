@@ -173,8 +173,9 @@ public extension AsyncTask {
                     }
                 }
 
-                // Safe to force unwrap since we verified tasks is not empty
-                let result = await group.next()!
+                guard let result = await group.next() else {
+                    preconditionFailure("A nonempty task group must produce a result")
+                }
                 group.cancelAll()
                 return result
             }
