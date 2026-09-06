@@ -12,7 +12,7 @@ test test-swift test-macos:
 	swift test
 
 test-linux:
-	docker run --rm -v "$(CURDIR):/workspace" -w /workspace swift:6.2 swift test --scratch-path .build/linux
+	docker run --rm -v "$(CURDIR):/workspace" -w /workspace swift:6.3 swift test --scratch-path .build/linux
 
 test-ios:
 	xcodebuild test -scheme "$(SCHEME)" -destination "$(IOS_DESTINATION)"

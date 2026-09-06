@@ -4,7 +4,7 @@ TaskLoom is preparing its first public release. Bug reports should include the S
 
 ## Development
 
-Use Swift 6.2 or newer, as specified in `Package.swift`. Apple-only Combine and serial-queue APIs need an Apple SDK. Linux validates the portable concurrency and Dispatch surface. Website development uses Node.js 22 (at least 22.12) and npm, matching CI.
+Use Swift 6.3 or newer, as specified in `Package.swift`. Apple-only Combine and serial-queue APIs need an Apple SDK. Linux validates the portable concurrency and Dispatch surface. Website development uses Node.js 22 (at least 22.12) and npm, matching CI.
 
 ```sh
 swift build

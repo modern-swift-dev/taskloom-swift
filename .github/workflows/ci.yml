@@ -10,11 +10,7 @@ permissions:
 jobs:
   linux:
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 1
-      matrix:
-        swift-version: ["6.2", "6.3"]
-    container: swift:${{ matrix.swift-version }}
+    container: swift:6.3
     steps:
       - uses: actions/checkout@v4
       - name: Release tests

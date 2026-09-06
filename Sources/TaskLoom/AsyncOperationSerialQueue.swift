@@ -1,9 +1,8 @@
+#if canImport(Combine)
 import Foundation
 import Logging
 import Synchronization
-#if canImport(Combine)
 import Combine
-#endif
 
 /// An async-await serial queue backed by an AsyncStream.
 /// This class provides a mechanism to execute asynchronous operations serially, ensuring that
@@ -372,3 +371,4 @@ public class AsyncOperationSerialQueue: Cancellable, @unchecked Sendable {
         })
     }
 }
+#endif
