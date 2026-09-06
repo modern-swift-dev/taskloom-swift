@@ -27,6 +27,7 @@ public actor AsyncSemaphore {
         let id: UUID
         let continuation: CheckedContinuation<Void, any Error>
     }
+
     private var waiters: [Waiter] = []
 
     /// Creates a new semaphore with the specified limit.
@@ -60,7 +61,9 @@ public actor AsyncSemaphore {
     }
 
     private func cancelWaiter(_ id: UUID) {
-        guard let index = waiters.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = waiters.firstIndex(where: { $0.id == id }) else {
+            return
+        }
         waiters.remove(at: index).continuation.resume(throwing: CancellationError())
     }
 

@@ -1,8 +1,8 @@
-import Testing
 import TaskLoom
 import TaskLoomTesting
+import Testing
 
-@Suite struct ManualClockTests {
+struct ManualClockTests {
     @Test func deadlinesAndCancellation() async throws {
         let clock = ManualClock()
         let first = Task { try await clock.sleep(for: .seconds(2)) }

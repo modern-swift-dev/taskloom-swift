@@ -11,7 +11,9 @@ public final class LatestTask {
     private var task: Task<Void, Never>?
 
     /// Whether the current request is still running.
-    public var isRunning: Bool { task != nil }
+    public var isRunning: Bool {
+        task != nil
+    }
 
     public init() {}
 
@@ -42,11 +44,17 @@ public final class LatestTask {
                 result = .failure(error)
             }
 
-            guard let self, self.generation === generation else { return }
+            guard let self, self.generation === generation else {
+                return
+            }
             self.task = nil
             self.generation = nil
-            guard !Task.isCancelled else { return }
-            if case .failure(let error) = result, error is CancellationError { return }
+            guard !Task.isCancelled else {
+                return
+            }
+            if case let .failure(error) = result, error is CancellationError {
+                return
+            }
             onCompletion(result)
         }
         self.task = task

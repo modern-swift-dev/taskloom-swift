@@ -26,7 +26,7 @@ public extension Collection where Element: Sendable {
                 }
             }
 
-            for _ in 0..<Swift.min(maxConcurrency, count) {
+            for _ in 0 ..< Swift.min(maxConcurrency, count) {
                 if let item = iterator.next() {
                     try schedule(item)
                 }

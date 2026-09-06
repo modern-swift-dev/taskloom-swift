@@ -1,7 +1,7 @@
 import TaskLoom
 import Testing
 
-@Suite @MainActor struct LatestTaskTests {
+@MainActor struct LatestTaskTests {
     @Test func supersededWorkCannotDeliverEvenWhenItIgnoresCancellation() async {
         let latest = LatestTask()
         let firstStarted = TestSignal()
@@ -12,12 +12,16 @@ import Testing
             await releaseFirst.wait()
             return 1
         } onCompletion: { result in
-            if case .success(let value) = result { received.append(value) }
+            if case let .success(value) = result {
+                received.append(value)
+            }
         }
         await firstStarted.wait()
         #expect(latest.isRunning)
         let second = latest.submit { 2 } onCompletion: { result in
-            if case .success(let value) = result { received.append(value) }
+            if case let .success(value) = result {
+                received.append(value)
+            }
         }
         await second.value
         await releaseFirst.signal()
@@ -50,7 +54,9 @@ import Testing
         let failure = latest.submit { () throws -> Int in
             throw Failure.expected
         } onCompletion: { result in
-            if case .failure(let error) = result { receivedFailure = error is Failure }
+            if case let .failure(error) = result {
+                receivedFailure = error is Failure
+            }
         }
         await failure.value
         #expect(receivedFailure)
@@ -68,9 +74,13 @@ import Testing
         var second: Task<Void, Never>?
         var received: [Int] = []
         let first = latest.submit { 1 } onCompletion: { result in
-            if case .success(let value) = result { received.append(value) }
+            if case let .success(value) = result {
+                received.append(value)
+            }
             second = latest.submit { 2 } onCompletion: { result in
-                if case .success(let value) = result { received.append(value) }
+                if case let .success(value) = result {
+                    received.append(value)
+                }
             }
         }
         await first.value

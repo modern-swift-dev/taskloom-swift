@@ -50,10 +50,12 @@ public actor OperationTraceRecorder {
         var cancellationRequested = false
         var pendingPermitWaits = 0
     }
+
     private struct Waiter {
         let predicate: @Sendable (OperationTraceEvent) -> Bool
         let continuation: CheckedContinuation<OperationTraceEvent, any Error>
     }
+
     private let recordsEvents: Bool
     private var history: [OperationTraceEvent] = []
     private var active: [UUID: Active] = [:]
@@ -63,7 +65,9 @@ public actor OperationTraceRecorder {
         self.recordsEvents = recordsEvents
     }
 
-    public func events() -> [OperationTraceEvent] { history }
+    public func events() -> [OperationTraceEvent] {
+        history
+    }
 
     public func activeOperations() -> [OperationTraceSnapshot] {
         active.values.map {
@@ -81,7 +85,9 @@ public actor OperationTraceRecorder {
         matching predicate: @escaping @Sendable (OperationTraceEvent) -> Bool
     ) async throws -> OperationTraceEvent {
         try Task.checkCancellation()
-        if let event = history.first(where: predicate) { return event }
+        if let event = history.first(where: predicate) {
+            return event
+        }
         let id = UUID()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -105,19 +111,25 @@ public actor OperationTraceRecorder {
             active[event.id] = Active(event: event, start: start)
         } else {
             // Inherited task-local context may outlive its originating operation.
-            guard active[event.id] != nil else { return }
+            guard active[event.id] != nil else {
+                return
+            }
             switch event.kind {
-            case .cancellationRequested: active[event.id]?.cancellationRequested = true
-            case .waitingForPermit: active[event.id]?.pendingPermitWaits += 1
-            case .acquiredPermit, .permitWaitCancelled:
-                if let count = active[event.id]?.pendingPermitWaits {
-                    active[event.id]?.pendingPermitWaits = max(0, count - 1)
-                }
-            case .succeeded, .failed: active.removeValue(forKey: event.id)
-            default: break
+                case .cancellationRequested: active[event.id]?.cancellationRequested = true
+                case .waitingForPermit: active[event.id]?.pendingPermitWaits += 1
+                case .acquiredPermit,
+                     .permitWaitCancelled:
+                    if let count = active[event.id]?.pendingPermitWaits {
+                        active[event.id]?.pendingPermitWaits = max(0, count - 1)
+                    }
+                case .succeeded,
+                     .failed: active.removeValue(forKey: event.id)
+                default: break
             }
         }
-        if recordsEvents { history.append(event) }
+        if recordsEvents {
+            history.append(event)
+        }
         let matching = waiters.filter { $0.value.predicate(event) }.map(\.key)
         for id in matching {
             waiters.removeValue(forKey: id)?.continuation.resume(returning: event)
@@ -138,6 +150,7 @@ private final class OperationTraceContext: Sendable {
         var finished = false
         var cancellation: Task<Void, Never>?
     }
+
     private let state = Mutex(State())
     let id = UUID()
     let parentID: UUID?
@@ -162,7 +175,9 @@ private final class OperationTraceContext: Sendable {
 
     func cancel() {
         state.withLock { state in
-            guard !state.finished, state.cancellation == nil else { return }
+            guard !state.finished, state.cancellation == nil else {
+                return
+            }
             state.cancellation = Task { await self.emit(.cancellationRequested) }
         }
     }

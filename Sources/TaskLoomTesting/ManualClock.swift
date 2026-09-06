@@ -7,10 +7,21 @@ public final class ManualClock: Clock, Sendable {
     public struct Instant: InstantProtocol, Sendable {
         public let offset: Swift.Duration
 
-        public init(offset: Swift.Duration = .zero) { self.offset = offset }
-        public func advanced(by duration: Swift.Duration) -> Self { Self(offset: offset + duration) }
-        public func duration(to other: Self) -> Swift.Duration { other.offset - offset }
-        public static func < (lhs: Self, rhs: Self) -> Bool { lhs.offset < rhs.offset }
+        public init(offset: Swift.Duration = .zero) {
+            self.offset = offset
+        }
+
+        public func advanced(by duration: Swift.Duration) -> Self {
+            Self(offset: offset + duration)
+        }
+
+        public func duration(to other: Self) -> Swift.Duration {
+            other.offset - offset
+        }
+
+        public static func < (lhs: Self, rhs: Self) -> Bool {
+            lhs.offset < rhs.offset
+        }
     }
 
     private struct Sleeper: Sendable {
@@ -32,9 +43,17 @@ public final class ManualClock: Clock, Sendable {
     private let state = Mutex(State())
 
     public init() {}
-    public var now: Instant { state.withLock { $0.now } }
-    public var minimumResolution: Swift.Duration { .nanoseconds(1) }
-    public var sleepingCount: Int { state.withLock { $0.sleepers.count } }
+    public var now: Instant {
+        state.withLock { $0.now }
+    }
+
+    public var minimumResolution: Swift.Duration {
+        .nanoseconds(1)
+    }
+
+    public var sleepingCount: Int {
+        state.withLock { $0.sleepers.count }
+    }
 
     public func sleep(until deadline: Instant, tolerance: Swift.Duration? = nil) async throws {
         let id = UUID()

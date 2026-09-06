@@ -423,8 +423,11 @@ private struct TestError: Error, Equatable {
 
         #expect(results.count == 3)
         #expect(try results[0].get() == 1)
-        if case .failure(let error) = results[1] { #expect(error is TestError) }
-        else { Issue.record("Expected retained failure") }
+        if case let .failure(error) = results[1] {
+            #expect(error is TestError)
+        } else {
+            Issue.record("Expected retained failure")
+        }
         #expect(try results[2].get() == 3)
     }
 

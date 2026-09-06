@@ -12,16 +12,18 @@ private actor ConcurrentMapTracker {
         maximum = max(maximum, active)
     }
 
-    func finish() { active -= 1 }
+    func finish() {
+        active -= 1
+    }
 }
 
-@Suite struct ConcurrentMapTests {
+struct ConcurrentMapTests {
     @Test func boundsWorkAndPreservesInputOrder() async throws {
-        let started = (0..<4).map { _ in TestSignal() }
-        let release = (0..<4).map { _ in TestSignal() }
+        let started = (0 ..< 4).map { _ in TestSignal() }
+        let release = (0 ..< 4).map { _ in TestSignal() }
         let tracker = ConcurrentMapTracker()
         let task = Task {
-            try await Array(0..<4).concurrentMap(maxConcurrency: 2) { value in
+            try await Array(0 ..< 4).concurrentMap(maxConcurrency: 2) { value in
                 await tracker.start(value)
                 await started[value].signal()
                 await release[value].wait()
@@ -57,7 +59,7 @@ private actor ConcurrentMapTracker {
         let siblingCancelled = TestSignal()
         let tracker = ConcurrentMapTracker()
         do {
-            _ = try await Array(0..<10).concurrentMap(maxConcurrency: 2) { value in
+            _ = try await Array(0 ..< 10).concurrentMap(maxConcurrency: 2) { value in
                 await tracker.start(value)
                 if value == 0 {
                     await siblingStarted.wait()
@@ -65,7 +67,7 @@ private actor ConcurrentMapTracker {
                 }
                 await siblingStarted.signal()
                 do {
-                    try await Task.sleep(for: .seconds(3_600))
+                    try await Task.sleep(for: .seconds(3600))
                 } catch {
                     await siblingCancelled.signal()
                     throw error
@@ -85,7 +87,7 @@ private actor ConcurrentMapTracker {
         let release = TestSignal()
         let tracker = ConcurrentMapTracker()
         let task = Task {
-            try await Array(0..<5).concurrentMap(maxConcurrency: 1) { value in
+            try await Array(0 ..< 5).concurrentMap(maxConcurrency: 1) { value in
                 await tracker.start(value)
                 await started.signal()
                 await release.wait() // Intentionally ignores cancellation.

@@ -60,7 +60,7 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
 
     /// Applies a cooperative timeout measured by the supplied clock.
     public func timeout<C: Clock>(_ duration: Duration, clock: C) -> AsyncOperation<Success>
-    where C.Duration == Duration {
+        where C.Duration == Duration {
         AsyncOperation {
             try await withThrowingTaskGroup(of: Success.self) { group in
                 group.addTask {
@@ -121,13 +121,17 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
                     if error is CancellationError || (error as? AsyncOperationError) == .cancelled {
                         throw error
                     }
-                    guard shouldRetry(error) else { throw error }
+                    guard shouldRetry(error) else {
+                        throw error
+                    }
                     guard attempt < attempts else {
                         throw AsyncOperationError.maxRetriesExceeded(attempts: attempts, lastError: error)
                     }
                     let delay = backoff.delay(for: attempt - 1)
                     await recordOperationTraceEvent(.retrying(attempt: attempt + 1, delay: delay))
-                    if delay > .zero { try await clock.sleep(for: delay) }
+                    if delay > .zero {
+                        try await clock.sleep(for: delay)
+                    }
                 }
             }
             preconditionFailure("Positive attempt count always returns or throws")
@@ -389,8 +393,7 @@ public extension AsyncOperation {
                 for (index, operation) in operations.enumerated() {
                     try Task.checkCancellation()
                     group.addTask {
-                        do { return (index, .success(try await operation.execute())) }
-                        catch { return (index, .failure(error)) }
+                        do { return (index, .success(try await operation.execute())) } catch { return (index, .failure(error)) }
                     }
                 }
                 var results: [(Int, Result<Success, any Error>)] = []
@@ -419,8 +422,14 @@ public extension AsyncOperation {
         recorder: OperationTraceRecorder? = nil
     ) -> AsyncOperation<Success> {
         AsyncOperation {
-            try await withOperationTrace(name: name, file: file, function: function, line: line,
-                                         recorder: recorder, operation: self.operation)
+            try await withOperationTrace(
+                name: name,
+                file: file,
+                function: function,
+                line: line,
+                recorder: recorder,
+                operation: self.operation
+            )
         }
     }
 }

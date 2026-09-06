@@ -2,11 +2,13 @@ import TaskLoom
 import TaskLoomTesting
 import Testing
 
-@Suite struct OperationClockTests {
+struct OperationClockTests {
     private enum Failure: Error { case transient }
     private actor Attempts {
         var count = 0
-        func next() -> Int { count += 1; return count }
+        func next() -> Int {
+            count += 1; return count
+        }
     }
 
     @Test func retryAdvancesUsingInjectedClockAndRecordsAttempt() async throws {
@@ -16,7 +18,9 @@ import Testing
         let task = Task {
             try await AsyncOperation {
                 let attempt = await attempts.next()
-                if attempt == 1 { throw Failure.transient }
+                if attempt == 1 {
+                    throw Failure.transient
+                }
                 return attempt
             }.retry(3, backoff: .constant(.seconds(5)), clock: clock)
                 .traced("retry", recorder: recorder).execute()
@@ -39,8 +43,7 @@ import Testing
         }
         try await clock.waitUntilSleeping(count: 2)
         clock.advance(by: .seconds(5))
-        do { _ = try await task.value; Issue.record("Expected timeout") }
-        catch { #expect((error as? AsyncOperationError) == .timeout(.seconds(5))) }
+        do { _ = try await task.value; Issue.record("Expected timeout") } catch { #expect((error as? AsyncOperationError) == .timeout(.seconds(5))) }
         #expect(clock.sleepingCount == 0)
     }
 
@@ -55,11 +58,11 @@ import Testing
         }
         try await clock.waitUntilSleeping()
         task.cancel()
-        do { _ = try await task.value; Issue.record("Expected cancellation") }
-        catch { #expect(error is CancellationError) }
+        do { _ = try await task.value; Issue.record("Expected cancellation") } catch { #expect(error is CancellationError) }
         #expect(await attempts.count == 1)
         #expect(clock.sleepingCount == 0)
     }
+
     @Test func throwingDelayedTaskPropagatesCancellation() async throws {
         let clock = ManualClock()
         let task: Task<Void, any Error> = DelayedTask(delay: .seconds(5), clock: clock) {
@@ -67,8 +70,7 @@ import Testing
         }
         try await clock.waitUntilSleeping()
         task.cancel()
-        do { try await task.value; Issue.record("Expected cancellation") }
-        catch { #expect(error is CancellationError) }
+        do { try await task.value; Issue.record("Expected cancellation") } catch { #expect(error is CancellationError) }
         #expect(clock.sleepingCount == 0)
     }
 }

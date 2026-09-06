@@ -55,7 +55,9 @@ import Logging
 ) -> Task<Void, Never> where C.Duration == Duration {
     Task(priority: priority) { @MainActor in
         do {
-            if delay > .zero { try await clock.sleep(for: delay) }
+            if delay > .zero {
+                try await clock.sleep(for: delay)
+            }
             try Task.checkCancellation()
             await handler()
         } catch is CancellationError {
@@ -78,7 +80,9 @@ import Logging
     _ handler: @MainActor @Sendable @escaping () async throws -> Void
 ) -> Task<Void, any Error> where C.Duration == Duration {
     Task(priority: priority) { @MainActor in
-        if delay > .zero { try await clock.sleep(for: delay) }
+        if delay > .zero {
+            try await clock.sleep(for: delay)
+        }
         try Task.checkCancellation()
         try await handler()
     }

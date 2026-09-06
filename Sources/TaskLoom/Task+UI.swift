@@ -18,7 +18,7 @@ public typealias UITaskAsyncCallback = @MainActor @Sendable () async -> Void
     _ line: UInt = #line,
     _ handler: @escaping UITaskAsyncCallback
 ) -> _Concurrency.Task<Void, Never> {
-    return Task(priority: priority) { @MainActor in
+    Task(priority: priority) { @MainActor in
         await handler()
     }
 }

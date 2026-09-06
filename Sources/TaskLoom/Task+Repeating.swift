@@ -35,9 +35,13 @@ import Logging
     Task(priority: priority) { @MainActor in
         do {
             while !Task.isCancelled {
-                if interval > .zero { try await clock.sleep(for: interval) }
+                if interval > .zero {
+                    try await clock.sleep(for: interval)
+                }
                 try Task.checkCancellation()
-                if !(await handler()) { return }
+                if !(await handler()) {
+                    return
+                }
             }
         } catch is CancellationError {
             // Cancellation is an expected way to stop repeating.

@@ -86,7 +86,7 @@ struct OperationTracingTests {
 
     @Test func repeatedExecutionsGetUniqueIDs() async throws {
         let recorder = OperationTraceRecorder(recordsEvents: true)
-        for _ in 0..<2 {
+        for _ in 0 ..< 2 {
             _ = try await withOperationTrace(name: "Repeated", recorder: recorder) { 0 }
         }
         let starts = await recorder.events().filter { $0.kind == .started }
@@ -107,9 +107,13 @@ struct OperationTracingTests {
                     await release.wait()
                 }
             }
-            while await semaphore.waitingCount < 1 { await Task.yield() }
+            while await semaphore.waitingCount < 1 {
+                await Task.yield()
+            }
             let second = Task { try await semaphore.withPermit {} }
-            while await semaphore.waitingCount < 2 { await Task.yield() }
+            while await semaphore.waitingCount < 2 {
+                await Task.yield()
+            }
             await semaphore.signal()
             await entered.wait()
             #expect(await recorder.activeOperations().first?.waitingForPermit == true)
@@ -127,7 +131,9 @@ struct OperationTracingTests {
         try await semaphore.wait()
         try await withOperationTrace(name: "Recovers child cancellation", recorder: recorder) {
             let child = Task { try await semaphore.withPermit {} }
-            while await semaphore.waitingCount < 1 { await Task.yield() }
+            while await semaphore.waitingCount < 1 {
+                await Task.yield()
+            }
             child.cancel()
             do {
                 try await child.value
