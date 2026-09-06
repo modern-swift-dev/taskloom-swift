@@ -73,17 +73,9 @@ depend on SwiftLibs' synchronized clock.
 
 ## Documentation and development
 
-Read the [DocC guides](Sources/TaskLoom/TaskLoom.docc/TaskLoom.md) or build the complete website and API reference locally:
+The [central documentation repository](https://github.com/modern-swift-dev/docs) owns Astro, the shared theme, and website/API generation. It builds from `main` daily and on manual runs. Edit page Markdown in `Documentation/Site/` and keep DocC catalogs beside the module sources. See the [docs README](https://github.com/modern-swift-dev/docs/blob/main/README.md) for local build and preview commands. Do not commit generated HTML to this repository.
 
-```sh
-make site-setup
-make site-build
-make site-preview
-```
-
-The [central documentation repository](https://github.com/modern-swift-dev/docs) builds and publishes the [TaskLoom site](https://modern-swift-dev.github.io/docs/taskloom-swift/) from `main` daily and on manual runs. Local builds write ignored output to `.build/site/`; documentation sources remain here.
-
-The local preview serves `/docs/taskloom-swift/`. The site builds from the current checkout; it does not require a published release. `make documentation` creates `.build/documentation/TaskLoom-Documentation.zip` for opening in Xcode or attaching to a release.
+Read the [DocC guides](Sources/TaskLoom/TaskLoom.docc/TaskLoom.md). `make documentation` creates `.build/documentation/TaskLoom-Documentation.zip` for Xcode and releases.
 
 The inherited `Publisher.single()` helper currently only reliably supports synchronous emission; it does not safely manage a long-lived subscription, empty completion, or task cancellation. Prefer another bridge for asynchronous publishers until that API is revised.
 

@@ -6,7 +6,7 @@ TVOS_DESTINATION ?= platform=tvOS Simulator,name=Apple TV 4K (3rd generation),OS
 WATCHOS_DESTINATION ?= platform=watchOS Simulator,name=Apple Watch Series 11 (46mm),OS=latest
 VISIONOS_DESTINATION ?= platform=visionOS Simulator,name=Apple Vision Pro,OS=latest
 
-.PHONY: test test-swift test-macos test-linux test-ios test-tvos test-watchos test-visionos test-apple documentation documentation-static site-setup site-build site-check site-preview
+.PHONY: test test-swift test-macos test-linux test-ios test-tvos test-watchos test-visionos test-apple documentation
 
 test test-swift test-macos:
 	swift test
@@ -35,18 +35,3 @@ test-apple:
 
 documentation:
 	bash scripts/build-documentation.sh
-
-documentation-static:
-	bash scripts/build-static-documentation.sh
-
-site-setup:
-	npm ci --prefix Website
-
-site-build:
-	bash scripts/build-site.sh
-
-site-check:
-	node Website/scripts/check-internal-links.mjs .build/site
-
-site-preview:
-	node scripts/preview-site.mjs .build/site
