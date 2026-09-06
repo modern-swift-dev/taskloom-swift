@@ -83,7 +83,7 @@ private typealias SerialQueueOperation = @MainActor @Sendable () async -> Void
         }
 
         // Wait for execution using flush
-        try? await Task.sleep(for: .milliseconds(10))
+        await queue.flush()
 
         let order = await tracker.getExecutionOrder()
         #expect(order == [1])
