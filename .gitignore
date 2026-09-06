@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+.DS_Store
+Website/node_modules/
+Website/dist/
+Website/.astro/

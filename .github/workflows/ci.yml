@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        swift-version: ["6.2", "6.3"]
+    container: swift:${{ matrix.swift-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release tests
+        run: swift test -c release
+
+  apple:
+    needs: linux
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - platform: macOS
+          - platform: iOS
+            simulator-name: iPhone 17 Pro
+          - platform: tvOS
+            simulator-name: Apple TV 4K (3rd generation)
+          - platform: visionOS
+            simulator-name: Apple Vision Pro
+          - platform: watchOS
+            simulator-name: Apple Watch Series 11 (46mm)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify toolchain
+        run: xcodebuild -version
+      - name: Select simulator
+        id: simulator
+        if: matrix.platform != 'macOS'
+        env:
+          SIMULATOR_NAME: ${{ matrix.simulator-name }}
+          RUNTIME_PLATFORM: ${{ matrix.platform }}
+        run: |
+          device_type_identifier="$(xcrun simctl list devicetypes --json | jq -er --arg name "$SIMULATOR_NAME" 'first(.devicetypes[] | select(.name == $name) | .identifier)')"
+          runtime_identifier="$(xcrun simctl list runtimes available --json | jq -er --arg platform "$RUNTIME_PLATFORM" '[.runtimes[] | select(.name | startswith($platform + " "))] | sort_by(.version | split(".") | map(tonumber)) | last | .identifier')"
+          if ! device_identifier="$(xcrun simctl list devices available --json | jq -er --arg name "$SIMULATOR_NAME" --arg runtime "$runtime_identifier" 'first(.devices[$runtime][] | select(.name == $name) | .udid)')"; then
+            device_identifier="$(xcrun simctl create "$SIMULATOR_NAME" "$device_type_identifier" "$runtime_identifier")"
+          fi
+          echo "device-id=$device_identifier" >> "$GITHUB_OUTPUT"
+      - name: Test
+        env:
+          SIMULATOR_ID: ${{ steps.simulator.outputs.device-id }}
+        run: |
+          if [ '${{ matrix.platform }}' = 'macOS' ]; then
+            swift test -c release
+          else
+            xcodebuild test -scheme TaskLoom -destination "id=$SIMULATOR_ID"
+          fi
