@@ -44,6 +44,16 @@ public struct AsyncTask<Success: Sendable>: Sendable {
     ///   - defaultValue: The value to return if the timeout is reached.
     /// - Returns: A new task with timeout applied.
     public func timeout(_ duration: Duration, default defaultValue: Success) -> AsyncTask<Success> {
+        timeout(duration, clock: ContinuousClock(), default: defaultValue)
+    }
+
+    /// Adds a timeout measured by the supplied clock. Cancellation is cooperative:
+    /// this still waits for the operation to finish after cancelling it.
+    public func timeout<C: Clock>(
+        _ duration: Duration,
+        clock: C,
+        default defaultValue: Success
+    ) -> AsyncTask<Success> where C.Duration == Duration {
         AsyncTask {
             await withTaskGroup(of: Success?.self) { group in
                 group.addTask {
@@ -51,7 +61,7 @@ public struct AsyncTask<Success: Sendable>: Sendable {
                 }
 
                 group.addTask {
-                    try? await Task.sleep(for: duration)
+                    try? await clock.sleep(for: duration)
                     return nil
                 }
 
@@ -66,15 +76,16 @@ public struct AsyncTask<Success: Sendable>: Sendable {
         }
     }
 
-    // MARK: - Rate Limiting
+    // MARK: - Concurrency Limiting
 
     /// Limits the task using a semaphore.
     ///
-    /// - Parameter semaphore: The semaphore to use for rate limiting.
-    /// - Returns: A new task that acquires a permit before executing.
-    public func limited(by semaphore: AsyncSemaphore) -> AsyncTask<Success> {
-        AsyncTask {
-            await semaphore.withPermit {
+    /// - Parameter semaphore: The semaphore to use for concurrency limiting.
+    /// - Returns: A throwing operation that acquires a permit before executing.
+    /// Cancellation while acquiring a permit throws; the task body remains nonthrowing.
+    public func limited(by semaphore: AsyncSemaphore) -> AsyncOperation<Success> {
+        AsyncOperation {
+            try await semaphore.withPermit {
                 await self.task()
             }
         }

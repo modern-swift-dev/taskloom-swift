@@ -55,6 +55,12 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
     /// - Parameter duration: The maximum time to wait for the operation to complete.
     /// - Returns: A new operation with timeout applied.
     public func timeout(_ duration: Duration) -> AsyncOperation<Success> {
+        timeout(duration, clock: ContinuousClock())
+    }
+
+    /// Applies a cooperative timeout measured by the supplied clock.
+    public func timeout<C: Clock>(_ duration: Duration, clock: C) -> AsyncOperation<Success>
+    where C.Duration == Duration {
         AsyncOperation {
             try await withThrowingTaskGroup(of: Success.self) { group in
                 group.addTask {
@@ -62,7 +68,7 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
                 }
 
                 group.addTask {
-                    try await Task.sleep(for: duration)
+                    try await clock.sleep(for: duration)
                     throw AsyncOperationError.timeout(duration)
                 }
 
@@ -86,39 +92,45 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
     /// - Parameters:
     ///   - attempts: The maximum number of attempts (including the initial attempt).
     ///   - backoff: The strategy for calculating delay between retries. Defaults to `.none`.
+    ///   - shouldRetry: Whether an ordinary failure is eligible for another attempt.
     /// - Returns: A new operation with retry logic applied.
     public func retry(
         _ attempts: Int,
-        backoff: BackoffStrategy = .none
+        backoff: BackoffStrategy = .none,
+        when shouldRetry: @escaping @Sendable (any Error) -> Bool = { _ in true }
     ) -> AsyncOperation<Success> {
+        retry(attempts, backoff: backoff, clock: ContinuousClock(), when: shouldRetry)
+    }
+
+    /// Retries eligible errors using an injectable clock. Cancellation never retries.
+    /// A rejected error propagates unchanged; exhausted eligible errors are wrapped.
+    public func retry<C: Clock>(
+        _ attempts: Int,
+        backoff: BackoffStrategy = .none,
+        clock: C,
+        when shouldRetry: @escaping @Sendable (any Error) -> Bool = { _ in true }
+    ) -> AsyncOperation<Success> where C.Duration == Duration {
         precondition(attempts > 0, "Retry attempts must be greater than 0")
-
         return AsyncOperation {
-            var lastError: (any Error)?
-
-            for attempt in 0 ..< attempts {
+            for attempt in 1 ... attempts {
+                try Task.checkCancellation()
                 do {
                     return try await self.operation()
                 } catch {
-                    lastError = error
-
-                    // Don't delay after the last attempt
-                    if attempt < attempts - 1 {
-                        let delay = backoff.delay(for: attempt)
-                        if delay > .zero {
-                            try await Task.sleep(for: delay)
-                        }
-                    }
-
-                    // Check for cancellation between retries
                     try Task.checkCancellation()
+                    if error is CancellationError || (error as? AsyncOperationError) == .cancelled {
+                        throw error
+                    }
+                    guard shouldRetry(error) else { throw error }
+                    guard attempt < attempts else {
+                        throw AsyncOperationError.maxRetriesExceeded(attempts: attempts, lastError: error)
+                    }
+                    let delay = backoff.delay(for: attempt - 1)
+                    await recordOperationTraceEvent(.retrying(attempt: attempt + 1, delay: delay))
+                    if delay > .zero { try await clock.sleep(for: delay) }
                 }
             }
-
-            throw AsyncOperationError.maxRetriesExceeded(
-                attempts: attempts,
-                lastError: lastError ?? AsyncOperationError.cancelled
-            )
+            preconditionFailure("Positive attempt count always returns or throws")
         }
     }
 
@@ -126,20 +138,15 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
 
     /// Provides a fallback value if the operation fails.
     ///
-    /// If the primary operation throws an error, the fallback closure will be executed instead.
+    /// If the primary operation throws an ordinary error, the fallback closure runs instead.
+    /// Cancellation propagates without invoking the fallback.
     ///
     /// - Parameter fallback: A closure that provides the fallback value.
     /// - Returns: A new operation that uses the fallback on failure.
     public func fallback(
         _ fallback: @escaping @Sendable () async throws -> Success
     ) -> AsyncOperation<Success> {
-        AsyncOperation {
-            do {
-                return try await self.operation()
-            } catch {
-                return try await fallback()
-            }
-        }
+        recover { _ in try await fallback() }
     }
 
     /// Provides a constant fallback value if the operation fails.
@@ -150,14 +157,33 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
         fallback { value }
     }
 
-    // MARK: - Rate Limiting
+    /// Recovers ordinary failures while propagating cancellation unchanged.
+    /// Also checks the current task's cancellation state before invoking recovery.
+    public func recover(
+        _ handler: @escaping @Sendable (any Error) async throws -> Success
+    ) -> AsyncOperation<Success> {
+        AsyncOperation {
+            try Task.checkCancellation()
+            do {
+                return try await self.operation()
+            } catch {
+                try Task.checkCancellation()
+                if error is CancellationError || (error as? AsyncOperationError) == .cancelled {
+                    throw error
+                }
+                return try await handler(error)
+            }
+        }
+    }
+
+    // MARK: - Concurrency Limiting
 
     /// Limits the operation using a semaphore.
     ///
     /// The operation will wait for a permit from the semaphore before executing,
     /// useful for limiting concurrent operations.
     ///
-    /// - Parameter semaphore: The semaphore to use for rate limiting.
+    /// - Parameter semaphore: The semaphore to use for concurrency limiting.
     /// - Returns: A new operation that acquires a permit before executing.
     public func limited(by semaphore: AsyncSemaphore) -> AsyncOperation<Success> {
         AsyncOperation {
@@ -352,55 +378,49 @@ public extension AsyncOperation {
         }
     }
 
-    /// Executes multiple operations concurrently, collecting successes and ignoring failures.
-    ///
-    /// - Parameter operations: The operations to execute.
-    /// - Returns: An operation that returns all successful results.
-    static func allSettled(_ operations: [AsyncOperation<Success>]) -> AsyncOperation<[Success]> {
-        AsyncOperation<[Success]> {
-            await withTaskGroup(of: (Int, Success?).self) { group in
+    /// Collects one result per input, in input order, retaining individual failures.
+    /// Parent cancellation cancels children and throws; child errors remain results.
+    static func allSettled(
+        _ operations: [AsyncOperation<Success>]
+    ) -> AsyncOperation<[Result<Success, any Error>]> {
+        AsyncOperation<[Result<Success, any Error>]> {
+            try Task.checkCancellation()
+            return try await withThrowingTaskGroup(of: (Int, Result<Success, any Error>).self) { group in
                 for (index, operation) in operations.enumerated() {
+                    try Task.checkCancellation()
                     group.addTask {
-                        (index, try? await operation.execute())
+                        do { return (index, .success(try await operation.execute())) }
+                        catch { return (index, .failure(error)) }
                     }
                 }
-
-                var results = [(Int, Success)]()
-                results.reserveCapacity(operations.count)
-
-                for await result in group {
-                    if let value = result.1 {
-                        results.append((result.0, value))
-                    }
+                var results: [(Int, Result<Success, any Error>)] = []
+                for try await result in group {
+                    try Task.checkCancellation()
+                    results.append(result)
                 }
-
+                try Task.checkCancellation()
                 return results.sorted { $0.0 < $1.0 }.map(\.1)
             }
         }
     }
+
 }
 
 // MARK: - Tracing
 
 public extension AsyncOperation {
-    /// Returns an operation with the same execution behavior.
-    ///
-    /// - Parameters:
-    ///   - file: The source file.
-    ///   - function: The function name.
-    ///   - line: The line number.
-    /// - Returns: A new operation with tracing enabled.
+    /// Records lifecycle diagnostics for each execution, with optional retained events and snapshots.
+    /// Place tracing after policies to include their retry and permit events in the same execution.
     func traced(
-        _ file: String = #file,
-        _ function: String = #function,
-        _ line: UInt = #line
+        _ name: String,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line,
+        recorder: OperationTraceRecorder? = nil
     ) -> AsyncOperation<Success> {
         AsyncOperation {
-            do {
-                return try await self.operation()
-            } catch {
-                throw error
-            }
+            try await withOperationTrace(name: name, file: file, function: function, line: line,
+                                         recorder: recorder, operation: self.operation)
         }
     }
 }

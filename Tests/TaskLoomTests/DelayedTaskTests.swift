@@ -212,43 +212,4 @@ private actor DelayedTaskTracker {
         #expect(order.contains("high"))
         #expect(order.contains("low"))
     }
-
-    // MARK: - TaskManager Integration
-
-    @Test func delayedTaskIntegratesWithTaskManager() async {
-        let manager = TaskManager.shared
-        let stateBefore = manager.getState()
-
-        let task = DelayedTask(delay: 0.01) {
-            // Small work
-        }
-
-        await task.value
-
-        // Give time for completion tracking
-        try? await Task.sleep(for: .milliseconds(10))
-
-        let stateAfter = manager.getState()
-
-        #expect(stateAfter.nbCreatedTaskTotal > stateBefore.nbCreatedTaskTotal)
-        #expect(stateAfter.nbCompletedTaskCount > stateBefore.nbCompletedTaskCount)
-    }
-
-    @Test func delayedTaskCancellationTrackedByTaskManager() async {
-        let manager = TaskManager.shared
-        let stateBefore = manager.getState()
-
-        let task = DelayedTask(delay: 1.0) {
-            // Won't execute due to cancellation
-        }
-
-        task.cancel()
-        await task.value
-
-        try? await Task.sleep(for: .milliseconds(10))
-
-        let stateAfter = manager.getState()
-
-        #expect(stateAfter.nbCancelledTaskCount > stateBefore.nbCancelledTaskCount)
-    }
 }

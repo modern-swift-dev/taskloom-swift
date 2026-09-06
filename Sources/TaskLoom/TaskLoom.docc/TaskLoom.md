@@ -14,6 +14,8 @@ TaskLoom contains the asynchronous utilities extracted from SwiftLibs. Its opera
 - <doc:CancellationAndRetries>
 - <doc:TaskLifetimes>
 - <doc:CombineAndDispatch>
+- <doc:DebuggingAndTesting>
+- <doc:ConcurrentWork>
 
 ### Composable work
 
@@ -22,3 +24,7 @@ TaskLoom contains the asynchronous utilities extracted from SwiftLibs. Its opera
 - ``AsyncOperationError``
 - ``BackoffStrategy``
 - ``AsyncSemaphore``
+- ``LatestTask``
+- ``OperationTraceRecorder``
+- ``OperationTraceEvent``
+- ``OperationTraceSnapshot``

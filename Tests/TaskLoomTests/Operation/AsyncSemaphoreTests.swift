@@ -57,23 +57,23 @@ private actor ConcurrencyTracker {
 
     // MARK: - Wait and Signal
 
-    @Test func waitDecrementsAvailablePermits() async {
+    @Test func waitDecrementsAvailablePermits() async throws {
         let semaphore = AsyncSemaphore(limit: 3)
 
-        await semaphore.wait()
+        try await semaphore.wait()
         let available = await semaphore.availablePermits
         #expect(available == 2)
 
-        await semaphore.wait()
+        try await semaphore.wait()
         let available2 = await semaphore.availablePermits
         #expect(available2 == 1)
     }
 
-    @Test func signalIncrementsAvailablePermits() async {
+    @Test func signalIncrementsAvailablePermits() async throws {
         let semaphore = AsyncSemaphore(limit: 2)
 
-        await semaphore.wait()
-        await semaphore.wait()
+        try await semaphore.wait()
+        try await semaphore.wait()
 
         let beforeSignal = await semaphore.availablePermits
         #expect(beforeSignal == 0)
@@ -97,20 +97,20 @@ private actor ConcurrencyTracker {
 
     // MARK: - withPermit
 
-    @Test func withPermitExecutesOperation() async {
+    @Test func withPermitExecutesOperation() async throws {
         let semaphore = AsyncSemaphore(limit: 1)
 
-        let result = await semaphore.withPermit {
+        let result = try await semaphore.withPermit {
             42
         }
 
         #expect(result == 42)
     }
 
-    @Test func withPermitReleasesOnCompletion() async {
+    @Test func withPermitReleasesOnCompletion() async throws {
         let semaphore = AsyncSemaphore(limit: 1)
 
-        _ = await semaphore.withPermit {
+        _ = try await semaphore.withPermit {
             "done"
         }
 
@@ -134,10 +134,10 @@ private actor ConcurrencyTracker {
         #expect(available == 1)
     }
 
-    @Test func withPermitNonThrowingVariant() async {
+    @Test func withPermitAcceptsNonThrowingWork() async throws {
         let semaphore = AsyncSemaphore(limit: 1)
 
-        let result = await semaphore.withPermit {
+        let result = try await semaphore.withPermit {
             "non-throwing"
         }
 
@@ -149,20 +149,21 @@ private actor ConcurrencyTracker {
 
     // MARK: - Concurrency Limiting
 
-    @Test func limitsConcurrentExecutions() async {
+    @Test func limitsConcurrentExecutions() async throws {
         let semaphore = AsyncSemaphore(limit: 2)
         let tracker = ConcurrencyTracker()
 
-        await withTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: Void.self) { group in
             for i in 0 ..< 5 {
                 group.addTask {
-                    await semaphore.withPermit {
+                    try await semaphore.withPermit {
                         await tracker.start(i)
                         try? await Task.sleep(for: .milliseconds(30))
                         await tracker.end(i)
                     }
                 }
             }
+            try await group.waitForAll()
         }
 
         let maxConcurrent = await tracker.getMaxConcurrent()
@@ -172,18 +173,18 @@ private actor ConcurrencyTracker {
         #expect(completed == 5)
     }
 
-    @Test func waitingCountTracksWaiters() async {
+    @Test func waitingCountTracksWaiters() async throws {
         let semaphore = AsyncSemaphore(limit: 1)
 
         // Acquire the only permit
-        await semaphore.wait()
+        try await semaphore.wait()
 
         // Start tasks that will wait
         let waitingTasks = Task {
-            await withTaskGroup(of: Void.self) { group in
+            try await withThrowingTaskGroup(of: Void.self) { group in
                 for _ in 0 ..< 3 {
                     group.addTask {
-                        await semaphore.wait()
+                        try await semaphore.wait()
                     }
                 }
 
@@ -204,33 +205,35 @@ private actor ConcurrencyTracker {
                 // Clean up - signal remaining
                 await semaphore.signal()
                 await semaphore.signal()
+                try await group.waitForAll()
             }
         }
 
-        await waitingTasks.value
+        try await waitingTasks.value
     }
 
     // MARK: - FIFO Order
 
-    @Test func resumesWaitersInFIFOOrder() async {
+    @Test func resumesWaitersInFIFOOrder() async throws {
         let semaphore = AsyncSemaphore(limit: 1)
         let tracker = ConcurrencyTracker()
 
         // Acquire the permit
-        await semaphore.wait()
+        try await semaphore.wait()
 
         // Start tasks that will wait in order
         let tasks = Task {
-            await withTaskGroup(of: Void.self) { group in
+            try await withThrowingTaskGroup(of: Void.self) { group in
                 for i in 0 ..< 3 {
                     group.addTask {
                         // Small delay to ensure ordered waiting
                         try? await Task.sleep(for: .milliseconds(i * 20))
-                        await semaphore.wait()
+                        try await semaphore.wait()
                         await tracker.start(i)
                         await semaphore.signal()
                     }
                 }
+                try await group.waitForAll()
             }
         }
 
@@ -240,7 +243,7 @@ private actor ConcurrencyTracker {
         // Release initial permit
         await semaphore.signal()
 
-        await tasks.value
+        try await tasks.value
 
         let events = await tracker.getEvents()
         // Tasks should start in order: 0, 1, 2

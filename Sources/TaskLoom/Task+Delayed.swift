@@ -18,19 +18,7 @@ import Logging
     _ line: UInt = #line,
     _ handler: @MainActor @Sendable @escaping () async -> Void
 ) -> _Concurrency.Task<Void, Never> {
-    return Task(priority: priority) { @MainActor in
-        if delay > 0 {
-            do {
-                try await Task.sleep(for: .seconds(delay))
-            } catch {
-                taskLoomLogger.error("\(error)")
-            }
-        }
-
-        if !Task.isCancelled {
-            await handler()
-        }
-    }
+    DelayedTask(priority: priority, delay: .seconds(delay), clock: ContinuousClock(), file, functionName, line, handler)
 }
 
 /// Creates and runs a delayed task on the main actor that can throw errors
@@ -51,22 +39,47 @@ import Logging
     _ line: UInt = #line,
     _ handler: @MainActor @Sendable @escaping () async throws -> Void
 ) -> _Concurrency.Task<Void, any Error> {
-    return Task(priority: priority) { @MainActor in
-        do {
-            if delay > 0 {
-                do {
-                    try await Task.sleep(for: .seconds(delay))
-                } catch {
-                    taskLoomLogger.error("\(error)")
-                }
-            }
+    DelayedTask(priority: priority, delay: .seconds(delay), clock: ContinuousClock(), file, functionName, line, handler)
+}
 
-            if !Task.isCancelled {
-                try await handler()
-            }
+/// Runs a main-actor handler after a delay measured by the supplied clock.
+/// Cancellation during the delay prevents the handler from running.
+@discardableResult public func DelayedTask<C: Clock>(
+    priority: TaskPriority = .medium,
+    delay: Duration = .zero,
+    clock: C,
+    _ file: String = #file,
+    _ functionName: String = #function,
+    _ line: UInt = #line,
+    _ handler: @MainActor @Sendable @escaping () async -> Void
+) -> Task<Void, Never> where C.Duration == Duration {
+    Task(priority: priority) { @MainActor in
+        do {
+            if delay > .zero { try await clock.sleep(for: delay) }
+            try Task.checkCancellation()
+            await handler()
+        } catch is CancellationError {
+            // Cancellation is an expected way to stop a delayed task.
         } catch {
             taskLoomLogger.error("\(error)")
-            throw error
         }
+    }
+}
+
+/// Runs a throwing main-actor handler after a delay measured by the supplied clock.
+/// Cancellation during the delay throws `CancellationError`.
+@discardableResult public func DelayedTask<C: Clock>(
+    priority: TaskPriority = .medium,
+    delay: Duration = .zero,
+    clock: C,
+    _ file: String = #file,
+    _ functionName: String = #function,
+    _ line: UInt = #line,
+    _ handler: @MainActor @Sendable @escaping () async throws -> Void
+) -> Task<Void, any Error> where C.Duration == Duration {
+    Task(priority: priority) { @MainActor in
+        if delay > .zero { try await clock.sleep(for: delay) }
+        try Task.checkCancellation()
+        try await handler()
     }
 }

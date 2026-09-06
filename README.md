@@ -38,7 +38,10 @@ Operations are lazy and reusable: each `execute()` runs the closure again. Here 
 | Area | APIs |
 | --- | --- |
 | Composable work | `AsyncOperation`, `AsyncTask`, mapping, fallback, racing, ordered collection |
-| Concurrency control | `AsyncSemaphore`, retry policies, `BackoffStrategy` |
+| Concurrency control | Cancellation-aware `AsyncSemaphore`, selective retries, `BackoffStrategy`, bounded `concurrentMap` |
+| Diagnostics | Named tracing, lifecycle events, execution snapshots, source locations |
+| UI coordination | `LatestTask` prevents superseded requests from delivering results |
+| Testing | Injectable clocks and the `TaskLoomTesting` product with `ManualClock` |
 | Task lifetimes | `UITask`, `DelayedTask`, `RepeatingTask` |
 | Combine | Publisher async bridges and iteration, task cancellation tokens, scheduler shortcuts, timers, notification helpers |
 | Serial work | `AsyncOperationSerialQueue` for main-actor operations, progress and cancellation |
@@ -50,7 +53,9 @@ The concurrency utilities support Apple platforms and Linux. Combine APIs, cance
 
 Cancellation is cooperative. Timeouts and races cancel losing child tasks, but structured task groups still wait for those children to finish. A closure that ignores cancellation can delay return beyond the configured timeout.
 
-`AsyncOperation.race` selects the first completion, including a failure. `all` preserves input order and throws on failure; `allSettled` returns only successful values in input order. Fallback handlers also receive cancellation failures, so use them deliberately when cancellation should propagate.
+`AsyncOperation.race` selects the first completion, including a failure. `all` preserves input order and throws on failure; `allSettled` retains one `Result` per input, including failures, and propagates parent cancellation. `fallback` and `recover` propagate cancellation instead of recovering from it.
+
+Semaphore `wait()` and `withPermit` throw on cancellation. Limiting an `AsyncTask` produces an `AsyncOperation`, since acquiring a permit can fail.
 
 `UITask`, `DelayedTask`, and `RepeatingTask` run their handlers on the main actor. Keep CPU-intensive work out of those handlers. Retain task handles and cancel them when their owner no longer needs the work. A repeating handler returns `false` to stop.
 
@@ -78,7 +83,7 @@ make site-preview
 
 The local preview serves `/taskloom-swift/`. The site builds from the current checkout; it does not require a published release. `make documentation` creates `.build/documentation/TaskLoom-Documentation.zip` for opening in Xcode or attaching to a release.
 
-The inherited `Publisher.single()` helper currently only reliably supports synchronous emission; it does not safely manage a long-lived subscription, empty completion, or task cancellation. Prefer another bridge for asynchronous publishers until that API is revised. Semaphore waits also do not currently respond to task cancellation.
+The inherited `Publisher.single()` helper currently only reliably supports synchronous emission; it does not safely manage a long-lived subscription, empty completion, or task cancellation. Prefer another bridge for asynchronous publishers until that API is revised.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for validation commands and contribution guidelines.
 

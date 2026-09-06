@@ -23,7 +23,11 @@ public actor AsyncSemaphore {
     public private(set) var availablePermits: Int
 
     /// Continuations waiting for a permit.
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private struct Waiter {
+        let id: UUID
+        let continuation: CheckedContinuation<Void, any Error>
+    }
+    private var waiters: [Waiter] = []
 
     /// Creates a new semaphore with the specified limit.
     /// - Parameter limit: The maximum number of concurrent permits. Must be greater than 0.
@@ -33,21 +37,49 @@ public actor AsyncSemaphore {
         self.availablePermits = limit
     }
 
-    /// Waits until a permit is available, then acquires it.
-    ///
-    /// If a permit is immediately available, this method returns without suspending.
-    /// Otherwise, it suspends until a permit becomes available via `signal()`.
-    /// Waiting does not observe task cancellation; a cancelled waiter still needs
-    /// a permit to resume. Prefer `withPermit` to ensure the permit is released.
-    public func wait() async {
+    /// Acquires a permit, throwing when the caller is cancelled while waiting.
+    /// A cancellation racing with acquisition returns the permit before throwing.
+    public func wait() async throws {
+        try Task.checkCancellation()
         if availablePermits > 0 {
             availablePermits -= 1
             return
         }
-
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                waiters.append(Waiter(id: id, continuation: continuation))
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(id) }
         }
+        if Task.isCancelled {
+            signal()
+            throw CancellationError()
+        }
+    }
+
+    private func cancelWaiter(_ id: UUID) {
+        guard let index = waiters.firstIndex(where: { $0.id == id }) else { return }
+        waiters.remove(at: index).continuation.resume(throwing: CancellationError())
+    }
+
+    /// Executes work with a permit, observing cancellation before starting work.
+    /// The permit is released on success, failure, or cancellation of the work.
+    public func withPermit<T: Sendable>(
+        _ operation: @Sendable () async throws -> T
+    ) async throws -> T {
+        await recordOperationTraceEvent(.waitingForPermit)
+        do {
+            try await wait()
+        } catch {
+            await recordOperationTraceEvent(.permitWaitCancelled)
+            throw error
+        }
+        defer { signal() }
+        await recordOperationTraceEvent(.acquiredPermit)
+        try Task.checkCancellation()
+        return try await operation()
     }
 
     /// Releases a permit, potentially allowing a waiting task to proceed.
@@ -57,38 +89,10 @@ public actor AsyncSemaphore {
     public func signal() {
         if let waiter = waiters.first {
             waiters.removeFirst()
-            waiter.resume()
+            waiter.continuation.resume()
         } else {
             availablePermits = min(availablePermits + 1, limit)
         }
-    }
-
-    /// Executes an operation while holding a permit.
-    ///
-    /// This method automatically acquires a permit before executing the operation
-    /// and releases it afterward, even if the operation throws an error.
-    ///
-    /// - Parameter operation: The async operation to execute.
-    /// - Returns: The result of the operation.
-    /// - Throws: Rethrows any error from the operation.
-    public func withPermit<T: Sendable>(
-        _ operation: @Sendable () async throws -> T
-    ) async rethrows -> T {
-        await wait()
-        defer { signal() }
-        return try await operation()
-    }
-
-    /// Executes a non-throwing operation while holding a permit.
-    ///
-    /// - Parameter operation: The async operation to execute.
-    /// - Returns: The result of the operation.
-    public func withPermit<T: Sendable>(
-        _ operation: @Sendable () async -> T
-    ) async -> T {
-        await wait()
-        defer { signal() }
-        return await operation()
     }
 
     /// Returns whether the semaphore has available permits without blocking.

@@ -12,7 +12,8 @@ let package = Package(
         .visionOS(.v2)
     ],
     products: [
-        .library(name: "TaskLoom", targets: ["TaskLoom"])
+        .library(name: "TaskLoom", targets: ["TaskLoom"]),
+        .library(name: "TaskLoomTesting", targets: ["TaskLoomTesting"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.1"),
@@ -33,6 +34,8 @@ let package = Package(
                 .enableUpcomingFeature("MemberImportVisibility")
             ]
         ),
+        .target(name: "TaskLoomTesting", dependencies: ["TaskLoom"]),
+        .testTarget(name: "TaskLoomTestingTests", dependencies: ["TaskLoomTesting", "TaskLoom"]),
         .testTarget(
             name: "TaskLoomTests",
             dependencies: ["TaskLoom"],

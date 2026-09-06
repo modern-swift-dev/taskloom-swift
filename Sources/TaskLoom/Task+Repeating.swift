@@ -18,18 +18,29 @@ import Logging
     _ line: UInt = #line,
     _ handler: @MainActor @Sendable @escaping () async -> Bool
 ) -> _Concurrency.Task<Void, Never> {
-    return Task(priority: priority) { @MainActor in
-        do {
-            var shouldContinue = true
-            while shouldContinue, !Task.isCancelled {
-                if interval > 0 {
-                    try await Task.sleep(for: .seconds(interval))
-                }
+    RepeatingTask(priority: priority, interval: .seconds(interval), clock: ContinuousClock(), file, functionName, line, handler)
+}
 
-                if !Task.isCancelled {
-                    shouldContinue = await handler()
-                }
+/// Repeats a main-actor handler, waiting on the clock before each iteration.
+/// Returns when the handler returns false, sleeping fails, or the task is cancelled.
+@discardableResult public func RepeatingTask<C: Clock>(
+    priority: TaskPriority = .low,
+    interval: Duration = .zero,
+    clock: C,
+    _ file: String = #file,
+    _ functionName: String = #function,
+    _ line: UInt = #line,
+    _ handler: @MainActor @Sendable @escaping () async -> Bool
+) -> Task<Void, Never> where C.Duration == Duration {
+    Task(priority: priority) { @MainActor in
+        do {
+            while !Task.isCancelled {
+                if interval > .zero { try await clock.sleep(for: interval) }
+                try Task.checkCancellation()
+                if !(await handler()) { return }
             }
+        } catch is CancellationError {
+            // Cancellation is an expected way to stop repeating.
         } catch {
             taskLoomLogger.error("\(error)")
         }

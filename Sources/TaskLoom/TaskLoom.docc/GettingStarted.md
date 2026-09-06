@@ -23,10 +23,10 @@ let result = try await operation.execute()
 
 ``AsyncOperation`` accepts a sendable asynchronous closure and returns a sendable result. Every execution runs the closure again. Use ``AsyncTask`` for work that returns a value without throwing. Its timeout takes a default value because failure is not part of its result type.
 
-Use `map` to transform a result and `flatMap` to select subsequent work. `all` runs operations concurrently and preserves their input order in the resulting array. `allSettled` omits failed operations; it does not return failure records.
+Use `map` to transform a result and `flatMap` to select subsequent work. `all` runs operations concurrently and preserves their input order in the resulting array. `allSettled` returns an ordered array of `Result` values, retaining failures and optional successes. Parent cancellation still throws. For bounded scheduling, use `collection.concurrentMap(maxConcurrency:)`.
 
 ## Limit concurrent work
 
-Share an ``AsyncSemaphore`` between operations and apply `limited(by:)` to each one. This bounds simultaneous work; it is not a requests-per-second rate limiter. Choose a positive permit count and keep the protected work asynchronous so waiting does not block a thread. Waiting for a permit is currently not cancellation-aware: cancelling a waiting task does not remove it from the semaphore's wait queue.
+Share an ``AsyncSemaphore`` between operations and apply `limited(by:)` to each one. This bounds simultaneous work; it is not a requests-per-second rate limiter. Choose a positive permit count and keep the protected work asynchronous so waiting does not block a thread. Both `wait()` and `withPermit` throw when cancelled. Cancelled waiters leave the queue without consuming a permit. Applying `limited(by:)` to a nonthrowing `AsyncTask` returns an `AsyncOperation` because permit acquisition can throw.
 
 See <doc:CancellationAndRetries> before composing timeout, retry, race, and fallback policies.

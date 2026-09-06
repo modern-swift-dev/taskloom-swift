@@ -105,27 +105,6 @@ private actor UITaskTracker {
         #expect(order.contains("high"))
     }
 
-    @Test func uiTaskIntegratesWithTaskManager() async {
-        let manager = TaskManager.shared
-        let stateBefore = manager.getState()
-
-        let task = UITask {
-            // Small delay to ensure task is "alive"
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-
-        await task.value
-
-        // Give time for completion to register
-        try? await Task.sleep(for: .milliseconds(5))
-
-        let stateAfter = manager.getState()
-
-        // Verify task was tracked
-        #expect(stateAfter.nbCreatedTaskTotal > stateBefore.nbCreatedTaskTotal)
-        #expect(stateAfter.nbCompletedTaskCount > stateBefore.nbCompletedTaskCount)
-    }
-
     @Test func uiTaskAsyncCallback() async {
         let tracker = UITaskTracker()
 

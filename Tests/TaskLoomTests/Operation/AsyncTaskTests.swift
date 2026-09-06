@@ -68,14 +68,14 @@ private actor ExecutionTracker {
 
     // MARK: - Rate Limiting
 
-    @Test func limitedBySemaphore() async {
+    @Test func limitedBySemaphore() async throws {
         let semaphore = AsyncSemaphore(limit: 2)
         let tracker = ExecutionTracker()
 
-        await withTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: Void.self) { group in
             for i in 0 ..< 5 {
                 group.addTask {
-                    _ = await AsyncTask {
+                    _ = try await AsyncTask {
                         await tracker.recordValue("start-\(i)")
                         try? await Task.sleep(for: .milliseconds(20))
                         await tracker.recordCompletion()
@@ -85,6 +85,7 @@ private actor ExecutionTracker {
                     .execute()
                 }
             }
+            try await group.waitForAll()
         }
 
         let completions = await tracker.getCompletionCount()

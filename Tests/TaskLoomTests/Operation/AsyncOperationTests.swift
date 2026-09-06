@@ -414,14 +414,18 @@ private struct TestError: Error, Equatable {
 
     // MARK: - AllSettled
 
-    @Test func allSettledIgnoresFailures() async throws {
+    @Test func allSettledPreservesFailures() async throws {
         let results = try await AsyncOperation.allSettled([
             AsyncOperation { 1 },
             AsyncOperation<Int> { throw TestError() },
             AsyncOperation { 3 }
         ]).execute()
 
-        #expect(results == [1, 3])
+        #expect(results.count == 3)
+        #expect(try results[0].get() == 1)
+        if case .failure(let error) = results[1] { #expect(error is TestError) }
+        else { Issue.record("Expected retained failure") }
+        #expect(try results[2].get() == 3)
     }
 
     // MARK: - Composability
@@ -452,7 +456,7 @@ private struct TestError: Error, Equatable {
 
     @Test func tracedReturnsSuccessfulResult() async throws {
         let result = try await AsyncOperation { "traced" }
-            .traced("Test.swift", "tracedReturnsSuccessfulResult()", 1)
+            .traced("success", file: "Test.swift", function: "tracedReturnsSuccessfulResult()", line: 1)
             .execute()
 
         #expect(result == "traced")
@@ -461,7 +465,7 @@ private struct TestError: Error, Equatable {
     @Test func tracedRethrowsFailure() async {
         await #expect(throws: TestError.self) {
             _ = try await AsyncOperation<String> { throw TestError("traced") }
-                .traced("Test.swift", "tracedRethrowsFailure()", 1)
+                .traced("failure", file: "Test.swift", function: "tracedRethrowsFailure()", line: 1)
                 .execute()
         }
     }

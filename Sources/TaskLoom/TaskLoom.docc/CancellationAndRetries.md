@@ -6,7 +6,7 @@ Understand policy ordering and cooperative cancellation before composing work.
 
 Modifiers wrap the operation built so far. `.retry(3).timeout(.seconds(5))` gives the whole sequence a five-second timeout. `.timeout(.seconds(5)).retry(3)` gives each attempt its own timeout. The retry count includes the initial attempt and must be positive.
 
-``BackoffStrategy`` provides constant, linear, exponential, jittered exponential, and custom delays. Exhausted retries throw `AsyncOperationError.maxRetriesExceeded`, preserving the last error. Cancellation is checked between retries.
+``BackoffStrategy`` provides constant, linear, exponential, jittered exponential, and custom delays. Exhausted retries throw `AsyncOperationError.maxRetriesExceeded`, preserving the last error. Cancellation is checked before each attempt and before backoff. Cancellation errors never retry. Use `retry(_:backoff:when:)` to select eligible failures; rejected errors propagate unchanged.
 
 ## Cooperative timeouts
 
@@ -18,6 +18,10 @@ Timeouts race work against a sleeping child task. The losing child is cancelled,
 
 `AsyncOperation.race` uses the first completed result, which may be an error. It does not wait for the first success after an earlier failure. Losing child tasks are cancelled cooperatively.
 
-`fallback` catches any error from its wrapped operation, including cancellation. Returning a fallback can therefore turn cancellation into a successful result. Use an explicit error-handling closure when the distinction matters. `checkCancellation()` checks immediately before starting its wrapped work; it does not automatically insert checks inside your closure.
+`fallback` and `recover` propagate `CancellationError`, `AsyncOperationError.cancelled`, and the current task's cancellation state. `recover` receives ordinary errors so it can select a replacement value. `checkCancellation()` checks immediately before starting its wrapped work; it does not automatically insert checks inside your closure.
 
-`allSettled` intentionally ignores failures and returns only successful results. Choose `all` when an unsuccessful child must fail the overall operation.
+`allSettled` retains one `Result` for every input in input order. Individual child failures, including child cancellation errors, become results; cancellation of the parent cancels the group and throws. Choose `all` when an unsuccessful child must fail the overall operation.
+
+## Injectable timing
+
+Timeouts and retries accept `clock:` overloads. `DelayedTask` and `RepeatingTask` accept `Duration` plus `clock:`; their handlers remain on the main actor. A throwing delayed task propagates cancellation. See <doc:DebuggingAndTesting> for deterministic tests.

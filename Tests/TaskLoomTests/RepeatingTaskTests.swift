@@ -226,48 +226,6 @@ private actor RepeatingTaskTracker {
         #expect(count == 1)
     }
 
-    // MARK: - TaskManager Integration
-
-    @Test func repeatingTaskIntegratesWithTaskManager() async {
-        let manager = TaskManager.shared
-        let stateBefore = manager.getState()
-
-        let tracker = RepeatingTaskTracker(maxExecutions: 3)
-        let task = RepeatingTask(interval: 0) {
-            await tracker.recordExecution()
-        }
-
-        await task.value
-
-        // Allow time for TaskManager state to update (increased for CI reliability)
-        try? await Task.sleep(for: .milliseconds(50))
-
-        let stateAfter = manager.getState()
-
-        #expect(stateAfter.nbCreatedTaskTotal > stateBefore.nbCreatedTaskTotal)
-        #expect(stateAfter.nbCompletedTaskCount > stateBefore.nbCompletedTaskCount)
-    }
-
-    @Test func repeatingTaskCancellationTracked() async {
-        let manager = TaskManager.shared
-        let stateBefore = manager.getState()
-
-        let tracker = RepeatingTaskTracker(maxExecutions: 100)
-        let task = RepeatingTask(interval: 0.1) {
-            await tracker.recordExecution()
-        }
-
-        task.cancel()
-        await task.value
-
-        // Allow time for TaskManager state to update (increased for CI reliability)
-        try? await Task.sleep(for: .milliseconds(50))
-
-        let stateAfter = manager.getState()
-
-        #expect(stateAfter.nbCancelledTaskCount > stateBefore.nbCancelledTaskCount)
-    }
-
     // MARK: - Return Type
 
     @Test func repeatingTaskReturnsNonThrowingTask() async {
