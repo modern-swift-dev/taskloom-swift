@@ -1,3 +1,6 @@
+# Override with a shell-quoted file list to check only changed Swift files.
+SWIFT_FILES ?= .
+
 SHELL := /bin/bash
 
 SCHEME ?= TaskLoom-Package
@@ -35,3 +38,22 @@ test-apple:
 
 documentation:
 	bash scripts/build-documentation.sh
+
+.PHONY: setup format lint
+
+setup:
+	brew bundle install
+	mint bootstrap
+	lefthook install
+
+format:
+	mint run --no-install nicklockwood/SwiftFormat $(SWIFT_FILES) --config .swiftformat --quiet
+	mint run --no-install realm/SwiftLint lint --config .swiftlint.yml --fix --quiet --force-exclude $(SWIFT_FILES)
+
+lint: lint-workflows
+	mint run --no-install realm/SwiftLint lint --config .swiftlint.yml --quiet --force-exclude $(SWIFT_FILES)
+
+.PHONY: lint-workflows
+
+lint-workflows:
+	actionlint

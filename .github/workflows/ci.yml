@@ -7,14 +7,44 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
+  lint:
+    runs-on: blacksmith-6vcpu-macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Swift 6.3
+        run: swift --version | grep -F 'Swift version 6.3'
+      - name: Install lint tools
+        run: |
+          brew install mint actionlint
+          mint bootstrap
+      - name: Lint
+        run: make lint
+
   linux:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     container: swift:6.3
     steps:
       - uses: actions/checkout@v4
+      - name: Verify Swift 6.3
+        run: swift --version | grep -F 'Swift version 6.3'
+      - name: Install Mint and xcbeautify
+        run: |
+          git clone --depth 1 --branch 0.18.0 https://github.com/yonaskolb/Mint.git "$RUNNER_TEMP/Mint"
+          swift build --package-path "$RUNNER_TEMP/Mint" -c release
+          mint_bin="$(swift build --package-path "$RUNNER_TEMP/Mint" -c release --show-bin-path)"
+          echo "$mint_bin" >> "$GITHUB_PATH"
+          "$mint_bin/mint" install cpisciotta/xcbeautify
+      - name: Release build
+        run: swift build -c release 2>&1 | mint run --no-install cpisciotta/xcbeautify -q
       - name: Release tests
-        run: swift test -c release
+        run: swift test -c release 2>&1 | mint run --no-install cpisciotta/xcbeautify -q
 
   apple:
     needs: linux
@@ -31,8 +61,14 @@ jobs:
             simulator-name: iPhone 17 Pro
     steps:
       - uses: actions/checkout@v4
+      - name: Verify Swift 6.3
+        run: swift --version | grep -F 'Swift version 6.3'
+      - name: Install xcbeautify
+        run: |
+          brew install mint
+          mint install cpisciotta/xcbeautify
       - name: Verify toolchain
-        run: xcodebuild -version
+        run: xcodebuild -version 2>&1 | mint run --no-install cpisciotta/xcbeautify -q
       - name: Select simulator
         id: simulator
         if: matrix.platform != 'macOS'
@@ -46,12 +82,21 @@ jobs:
             device_identifier="$(xcrun simctl create "$SIMULATOR_NAME" "$device_type_identifier" "$runtime_identifier")"
           fi
           echo "device-id=$device_identifier" >> "$GITHUB_OUTPUT"
+      - name: Build
+        env:
+          SIMULATOR_ID: ${{ steps.simulator.outputs.device-id }}
+        run: |
+          if [ '${{ matrix.platform }}' = 'macOS' ]; then
+            swift build -c release 2>&1 | mint run --no-install cpisciotta/xcbeautify -q
+          else
+            xcodebuild build -scheme TaskLoom-Package -destination "id=$SIMULATOR_ID" 2>&1 | mint run --no-install cpisciotta/xcbeautify -q
+          fi
       - name: Test
         env:
           SIMULATOR_ID: ${{ steps.simulator.outputs.device-id }}
         run: |
           if [ '${{ matrix.platform }}' = 'macOS' ]; then
-            swift test -c release
+            swift test -c release 2>&1 | mint run --no-install cpisciotta/xcbeautify -q
           else
-            xcodebuild test -scheme TaskLoom-Package -destination "id=$SIMULATOR_ID"
+            xcodebuild test -scheme TaskLoom-Package -destination "id=$SIMULATOR_ID" 2>&1 | mint run --no-install cpisciotta/xcbeautify -q
           fi

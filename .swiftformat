@@ -1,0 +1,2 @@
+--exclude .build,**/.build,.swiftpm
+--swiftversion 6.3
