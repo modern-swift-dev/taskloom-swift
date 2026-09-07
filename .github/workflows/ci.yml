@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   lint:
-    runs-on: blacksmith-6vcpu-macos-26
+    runs-on: macos-26
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
@@ -28,7 +28,7 @@ jobs:
         run: make lint
 
   linux:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     container: swift:6.3
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
 
   apple:
     needs: linux
-    runs-on: blacksmith-6vcpu-macos-26
+    runs-on: macos-26
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     strategy:
