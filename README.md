@@ -38,7 +38,7 @@ Operations are lazy and reusable: each `execute()` runs the closure again. Here 
 | Area | APIs |
 | --- | --- |
 | Composable work | `AsyncOperation`, `AsyncTask`, mapping, fallback, racing, ordered collection |
-| Concurrency control | Cancellation-aware `AsyncSemaphore`, selective retries, `BackoffStrategy`, bounded `concurrentMap` |
+| Concurrency control | Cancellation-aware `AsyncSemaphore`, selective retries, `BackoffStrategy`, bounded `concurrentMap` and `concurrentForEach` |
 | Diagnostics | Named tracing, lifecycle events, execution snapshots, source locations |
 | UI coordination | `LatestTask` prevents superseded requests from delivering results |
 | Testing | Injectable clocks and the `TaskLoomTesting` product with `ManualClock` |

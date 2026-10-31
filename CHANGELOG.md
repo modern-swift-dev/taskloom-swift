@@ -17,3 +17,4 @@ All notable changes to TaskLoom are documented here. Before 1.0, minor releases 
 
 - Added `AsyncOperation.firstSuccess(_:)`, which returns the first operation to succeed and cancels the rest. If every operation fails it throws the new `AsyncOperationError.allFailed([any Error])`, with errors in input order.
 - Added deadline timeouts: `AsyncOperation.timeout(until:clock:)` and a `ContinuousClock` convenience `timeout(until:)`, so several steps can share one cut-off, plus the matching `AsyncTask.timeout(until:clock:default:)`. A deadline that has already passed times out immediately without starting the work.
+- Added `Collection.concurrentForEach(maxConcurrency:_:)`, which runs a throwing body for every element with the same concurrency limit, failure, and cancellation rules as `concurrentMap`, without collecting results.

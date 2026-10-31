@@ -49,4 +49,47 @@ public extension Collection where Element: Sendable {
             }
         }
     }
+
+    /// Runs `body` for every element concurrently.
+    ///
+    /// At most `maxConcurrency` child tasks run at once. A failure cancels the
+    /// remaining children and is rethrown, and cancellation stops scheduling additional elements.
+    /// As with all task groups, this method waits for children to finish; bodies
+    /// must cooperate with cancellation to stop promptly.
+    ///
+    /// - Precondition: `maxConcurrency` is greater than zero.
+    func concurrentForEach(
+        maxConcurrency: Int,
+        _ body: @escaping @Sendable (Element) async throws -> Void
+    ) async throws {
+        precondition(maxConcurrency > 0, "maxConcurrency must be greater than zero")
+        try Task.checkCancellation()
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            var iterator = makeIterator()
+
+            func schedule(_ element: Element) throws {
+                try Task.checkCancellation()
+                group.addTask {
+                    try Task.checkCancellation()
+                    try await body(element)
+                }
+            }
+
+            for _ in 0 ..< maxConcurrency {
+                guard let element = iterator.next() else {
+                    break
+                }
+                try schedule(element)
+            }
+
+            while try await group.next() != nil {
+                try Task.checkCancellation()
+                if let element = iterator.next() {
+                    try schedule(element)
+                }
+            }
+            try Task.checkCancellation()
+        }
+    }
 }
