@@ -12,3 +12,5 @@ All notable changes to TaskLoom are documented here. Before 1.0, minor releases 
 - `AsyncOperationError` no longer conforms to `Equatable`. Match with `if case`, for example `if case let .timeout(duration) = error as? AsyncOperationError { ... }`.
 
 ### Added
+
+- Added `AsyncOperation.firstSuccess(_:)`, which returns the first operation to succeed and cancels the rest. If every operation fails it throws the new `AsyncOperationError.allFailed([any Error])`, with errors in input order.

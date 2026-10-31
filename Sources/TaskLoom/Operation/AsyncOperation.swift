@@ -345,6 +345,44 @@ public extension AsyncOperation {
         }
     }
 
+    /// Returns the first operation to succeed, ignoring failures.
+    ///
+    /// Unlike ``race(_:)``, a failure does not end the competition. When one operation
+    /// succeeds, the remaining operations are cancelled, and the task group waits for
+    /// their cooperative termination before the value is returned.
+    ///
+    /// - Parameter operations: The operations to run concurrently.
+    /// - Returns: An operation that returns the first successful value. If every operation
+    ///   fails, it throws ``AsyncOperationError/allFailed(_:)`` with the errors in input order.
+    ///   Cancelling the caller throws `CancellationError` instead.
+    static func firstSuccess(_ operations: [AsyncOperation<Success>]) -> AsyncOperation<Success> {
+        precondition(!operations.isEmpty, "Cannot take the first success of zero operations")
+
+        return AsyncOperation {
+            try await withThrowingTaskGroup(of: (Int, Result<Success, any Error>).self) { group in
+                for (index, operation) in operations.enumerated() {
+                    group.addTask {
+                        do { return (index, .success(try await operation.execute())) } catch { return (index, .failure(error)) }
+                    }
+                }
+
+                var failures: [Int: any Error] = [:]
+                while let (index, result) = try await group.next() {
+                    switch result {
+                        case let .success(value):
+                            group.cancelAll()
+                            return value
+                        case let .failure(error):
+                            failures[index] = error
+                    }
+                }
+
+                try Task.checkCancellation()
+                throw AsyncOperationError.allFailed(failures.sorted { $0.key < $1.key }.map(\.value))
+            }
+        }
+    }
+
     /// Races this operation against another and returns the first to complete.
     ///
     /// - Parameter other: The operation to race against.
