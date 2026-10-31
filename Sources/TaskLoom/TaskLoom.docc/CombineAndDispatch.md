@@ -8,9 +8,9 @@ Combine helpers and `AsyncOperationSerialQueue` are guarded by `canImport(Combin
 
 ## Publishers and tasks
 
-The publisher extensions include async value access with `single()`, asynchronous iteration with `iterate`, `Future.asynchronous` for wrapping async work, and receive/subscribe scheduler conveniences. Choose the overload matching the publisher's failure type, and retain any returned cancellation token for as long as the subscription is needed.
+The publisher extensions include asynchronous iteration with `iterate`, `Future.asynchronous` for wrapping async work, and receive/subscribe scheduler conveniences. Choose the overload matching the publisher's failure type, and retain any returned cancellation token for as long as the subscription is needed.
 
-The inherited `single()` implementation currently discards its subscription token, so only synchronous emissions are reliable. Empty completion does not resume the continuation, and cancelling the awaiting task does not terminate the wait. Do not use this helper as a general asynchronous publisher bridge until those lifetime behaviors are revised.
+To read values from an asynchronous publisher, use its `values` sequence directly: `for try await value in publisher.values { ... }`, or `for await value in publisher.values { ... }` when `Failure == Never`. `publisher.values` is Combine's API, not a TaskLoom extension.
 
 `iterate` uses the publisher's asynchronous `values` sequence and stops when your handler returns `false`. `Future.asynchronous` starts its task when the future is created. Cancelling a downstream subscription does not cancel that task; use it for bounded work whose ownership is deliberate.
 

@@ -7,5 +7,6 @@ All notable changes to TaskLoom are documented here. Before 1.0, minor releases 
 ### Breaking
 
 - Removed the unused `swift-async-algorithms` and `swift-collections` dependencies. If you relied on them transitively, add them to your own package.
+- Removed `Publisher.single()`. Replace it with `for try await value in publisher.values { ... }`, or `for await value in publisher.values { ... }` when `Failure == Never`.
 
 ### Added

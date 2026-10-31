@@ -6,107 +6,6 @@
 
     @Suite(.serialized) struct PublisherAsyncTests {
 
-        // MARK: - single() for Non-Throwing Publishers
-
-        @Test func singleReturnsFirstValue() async {
-            let publisher = Just(42)
-
-            let result = await publisher.single()
-
-            #expect(result == 42)
-        }
-
-        @Test func singleReturnsFirstValueFromSequence() async {
-            let publisher = [1, 2, 3, 4, 5].publisher
-
-            let result = await publisher.single()
-
-            #expect(result == 1)
-        }
-
-        @Test func singleWorksWithDeferredPublisher() async {
-            // Use Deferred to create a publisher that emits when subscribed
-            let publisher = Deferred {
-                Just("Hello")
-            }
-
-            let result = await publisher.single()
-
-            #expect(result == "Hello")
-        }
-
-        @Test func singleWorksWithCurrentValueSubject() async {
-            let subject = CurrentValueSubject<Int, Never>(100)
-
-            let result = await subject.single()
-
-            #expect(result == 100)
-        }
-
-        @Test func singleWorksWithMappedPublisher() async {
-            let publisher = Just(10)
-                .map { $0 * 2 }
-
-            let result = await publisher.single()
-
-            #expect(result == 20)
-        }
-
-        // MARK: - single() for Throwing Publishers
-
-        @Test func singleThrowingReturnsValue() async throws {
-            let publisher = Just(42)
-                .setFailureType(to: Error.self)
-
-            let result = try await publisher.single()
-
-            #expect(result == 42)
-        }
-
-        @Test func singleThrowingPropagatesError() async {
-            struct TestError: Error, Equatable {}
-
-            let publisher = Fail<Int, TestError>(error: TestError())
-
-            do {
-                _ = try await publisher.single()
-                Issue.record("Expected error to be thrown")
-            } catch is TestError {
-                // Expected
-            } catch {
-                Issue.record("Expected TestError but got \(error)")
-            }
-        }
-
-        @Test func singleThrowingWorksWithTryMap() async throws {
-            let publisher = Just(10)
-                .tryMap { value -> Int in
-                    value * 3
-                }
-
-            let result = try await publisher.single()
-
-            #expect(result == 30)
-        }
-
-        @Test func singleThrowingPropagatesTryMapError() async {
-            struct MapError: Error {}
-
-            let publisher = Just(10)
-                .tryMap { _ -> Int in
-                    throw MapError()
-                }
-
-            do {
-                _ = try await publisher.single()
-                Issue.record("Expected error to be thrown")
-            } catch is MapError {
-                // Expected
-            } catch {
-                Issue.record("Expected MapError but got \(error)")
-            }
-        }
-
         // MARK: - iterate() for Non-Throwing Publishers
 
         @Test func iterateProcessesAllValues() async {
@@ -286,20 +185,6 @@
             _ = cancellable
 
             #expect(result == "async result")
-        }
-
-        // MARK: - Sendable Conformance
-
-        @Test func singleWorksWithSendableTypes() async {
-            struct SendableValue: Sendable, Equatable {
-                let value: Int
-            }
-
-            let publisher = Just(SendableValue(value: 42))
-
-            let result = await publisher.single()
-
-            #expect(result == SendableValue(value: 42))
         }
     }
 
