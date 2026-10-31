@@ -6,6 +6,10 @@ public enum AsyncOperationError: Error, Sendable {
     case timeout(Duration)
     /// The operation failed after exhausting all retry attempts.
     case maxRetriesExceeded(attempts: Int, lastError: any Error)
+    /// Every operation passed to `AsyncOperation.firstSuccess` failed.
+    ///
+    /// The errors are in the same order as the input operations, not completion order.
+    case allFailed([any Error])
 }
 
 extension AsyncOperationError: LocalizedError {
@@ -15,6 +19,8 @@ extension AsyncOperationError: LocalizedError {
                 "Operation timed out after \(duration)"
             case let .maxRetriesExceeded(attempts, lastError):
                 "Operation failed after \(attempts) attempts. Last error: \(lastError.localizedDescription)"
+            case let .allFailed(errors):
+                "All \(errors.count) operations failed. Errors: \(errors.map(\.localizedDescription).joined(separator: "; "))"
         }
     }
 }
