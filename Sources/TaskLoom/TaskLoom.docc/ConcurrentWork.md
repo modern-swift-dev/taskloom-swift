@@ -1,6 +1,6 @@
 # Concurrent work
 
-Bound batch processing and prevent outdated requests from updating UI state.
+Bound batch processing, share duplicate requests, and prevent outdated requests from updating UI state.
 
 ## Bound a collection transform
 
@@ -13,6 +13,22 @@ let thumbnails = try await photos.concurrentMap(maxConcurrency: 4) {
 The limit must be positive. The result preserves input order, including optional values, while at most four child tasks execute transforms. Failure cancels remaining children; parent cancellation stops further scheduling. Structured concurrency still waits for children to finish, so transforms must cooperate with cancellation.
 
 When each element only performs work and produces no result, use `concurrentForEach(maxConcurrency:_:)`. It applies the same limit, failure, and cancellation rules without collecting outputs.
+
+## Share one flight per key
+
+Use `SingleFlight` when several callers may ask for the same thing at once:
+
+```swift
+let profiles = SingleFlight<User.ID, Profile>()
+
+let profile = try await profiles.run(key: userID) {
+    try await api.fetchProfile(userID)
+}
+```
+
+The first caller for a key starts a flight. Callers that arrive while it runs wait for the same result, and their closures are not called. When the flight finishes, the key is cleared and every waiter receives the same value or the same error. Nothing is cached, so the next call starts a new flight. Different keys run independently.
+
+A cancelled waiter throws `CancellationError` immediately and stops waiting; the others keep waiting. The flight's work is cancelled only when every waiter has cancelled, and the key is then cleared so the next call starts fresh. The operation must cooperate with cancellation to stop promptly.
 
 ## Deliver only the latest request
 
