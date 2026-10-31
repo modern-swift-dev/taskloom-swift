@@ -323,7 +323,11 @@ private struct TestError: Error, Equatable {
 
     @Test func checkCancellationThrowsWhenTaskIsCancelled() async throws {
         let task = Task {
-            try await AsyncOperation { "cancelled" }
+            // Start the operation only after cancellation so it cannot finish first.
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            return try await AsyncOperation { "cancelled" }
                 .checkCancellation()
                 .execute()
         }
