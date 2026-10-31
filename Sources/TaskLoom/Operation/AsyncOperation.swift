@@ -92,23 +92,24 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
     /// - Parameters:
     ///   - attempts: The maximum number of attempts (including the initial attempt).
     ///   - backoff: The strategy for calculating delay between retries. Defaults to `.none`.
-    ///   - shouldRetry: Whether an ordinary failure is eligible for another attempt.
+    ///   - decide: Chooses a ``RetryDecision`` for an ordinary failure. Defaults to `.retry`.
+    ///     It is never called for cancellation.
     /// - Returns: A new operation with retry logic applied.
     public func retry(
         _ attempts: Int,
         backoff: BackoffStrategy = .none,
-        when shouldRetry: @escaping @Sendable (any Error) -> Bool = { _ in true }
+        decide: @escaping @Sendable (any Error) -> RetryDecision = { _ in .retry }
     ) -> AsyncOperation<Success> {
-        retry(attempts, backoff: backoff, clock: ContinuousClock(), when: shouldRetry)
+        retry(attempts, backoff: backoff, clock: ContinuousClock(), decide: decide)
     }
 
-    /// Retries eligible errors using an injectable clock. Cancellation never retries.
-    /// A rejected error propagates unchanged; exhausted eligible errors are wrapped.
+    /// Retries failures according to a ``RetryDecision``, sleeping on an injectable clock.
+    /// Cancellation never retries. A `.stop` error propagates unchanged; exhausted attempts are wrapped.
     public func retry<C: Clock>(
         _ attempts: Int,
         backoff: BackoffStrategy = .none,
         clock: C,
-        when shouldRetry: @escaping @Sendable (any Error) -> Bool = { _ in true }
+        decide: @escaping @Sendable (any Error) -> RetryDecision = { _ in .retry }
     ) -> AsyncOperation<Success> where C.Duration == Duration {
         precondition(attempts > 0, "Retry attempts must be greater than 0")
         return AsyncOperation {
@@ -121,13 +122,13 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
                     if error is CancellationError {
                         throw error
                     }
-                    guard shouldRetry(error) else {
+                    guard case let .retry(requestedDelay) = decide(error) else {
                         throw error
                     }
                     guard attempt < attempts else {
                         throw AsyncOperationError.maxRetriesExceeded(attempts: attempts, lastError: error)
                     }
-                    let delay = backoff.delay(for: attempt - 1)
+                    let delay = requestedDelay ?? backoff.delay(for: attempt - 1)
                     await recordOperationTraceEvent(.retrying(attempt: attempt + 1, delay: delay))
                     if delay > .zero {
                         try await clock.sleep(for: delay)
