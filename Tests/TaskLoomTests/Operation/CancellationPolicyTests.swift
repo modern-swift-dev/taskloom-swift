@@ -80,6 +80,38 @@ struct CancellationPolicyTests {
         #expect(await counter.value == 1)
     }
 
+    @Test func retryDoesNotRetryAfterCancellationError() async {
+        let counter = Counter()
+        let operation = AsyncOperation<Int> {
+            _ = await counter.increment()
+            throw CancellationError()
+        }.retry(4)
+        await #expect(throws: CancellationError.self) { try await operation.execute() }
+        #expect(await counter.value == 1)
+    }
+
+    @Test func fallbackPropagatesCancellationError() async {
+        let counter = Counter()
+        let operation = AsyncOperation<Int> { throw CancellationError() }
+            .fallback {
+                _ = await counter.increment()
+                return 10
+            }
+        await #expect(throws: CancellationError.self) { try await operation.execute() }
+        #expect(await counter.value == 0)
+    }
+
+    @Test func recoverPropagatesCancellationError() async {
+        let counter = Counter()
+        let operation = AsyncOperation<Int> { throw CancellationError() }
+            .recover { _ in
+                _ = await counter.increment()
+                return 10
+            }
+        await #expect(throws: CancellationError.self) { try await operation.execute() }
+        #expect(await counter.value == 0)
+    }
+
     @Test func recoveryReceivesOrdinaryFailure() async throws {
         let value = try await AsyncOperation<Int> { throw Failure.permanent }
             .recover { error in

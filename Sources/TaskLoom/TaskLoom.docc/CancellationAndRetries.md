@@ -18,7 +18,7 @@ Timeouts race work against a sleeping child task. The losing child is cancelled,
 
 `AsyncOperation.race` uses the first completed result, which may be an error. It does not wait for the first success after an earlier failure. Losing child tasks are cancelled cooperatively.
 
-`fallback` and `recover` propagate `CancellationError`, `AsyncOperationError.cancelled`, and the current task's cancellation state. `recover` receives ordinary errors so it can select a replacement value. `checkCancellation()` checks immediately before starting its wrapped work; it does not automatically insert checks inside your closure.
+`fallback` and `recover` propagate `CancellationError` and the current task's cancellation state. `recover` receives ordinary errors so it can select a replacement value. `checkCancellation()` checks immediately before starting its wrapped work; it does not automatically insert checks inside your closure.
 
 `allSettled` retains one `Result` for every input in input order. Individual child failures, including child cancellation errors, become results; cancellation of the parent cancels the group and throws. Choose `all` when an unsuccessful child must fail the overall operation.
 
