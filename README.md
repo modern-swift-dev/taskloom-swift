@@ -44,10 +44,10 @@ Operations are lazy and reusable: each `execute()` runs the closure again. Here 
 | Testing | Injectable clocks and the `TaskLoomTesting` product with `ManualClock` |
 | Task lifetimes | `UITask`, `DelayedTask`, `RepeatingTask` |
 | Combine | Publisher async bridges and iteration, task cancellation tokens, scheduler shortcuts, timers, notification helpers |
-| Serial work | `AsyncOperationSerialQueue` for main-actor operations, progress and cancellation |
+| Serial work | `AsyncOperationSerialQueue` runs operations one at a time in enqueue order and returns their results, with cancellation |
 | GCD | Named `DispatchQueue` conveniences for quality-of-service classes |
 
-The concurrency utilities support Apple platforms and Linux. Combine APIs, cancellation-token helpers, and the serial queue are compiled only where Combine is available. Dispatch conveniences require Dispatch. See [Package.swift](Package.swift) for the supported toolchain and minimum platform versions.
+The concurrency utilities support Apple platforms and Linux. Combine APIs and cancellation-token helpers are compiled only where Combine is available. Dispatch conveniences require Dispatch. See [Package.swift](Package.swift) for the supported toolchain and minimum platform versions.
 
 ## Cancellation and execution semantics
 

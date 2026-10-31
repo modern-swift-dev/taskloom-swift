@@ -4,7 +4,7 @@ Compose asynchronous work, manage task lifetimes, and bridge Swift concurrency w
 
 ## Overview
 
-TaskLoom contains the asynchronous utilities extracted from SwiftLibs. Its operation types are lazy: configuration creates a value, and execution starts the work. Combine conveniences and the main-actor serial queue are available only on platforms that provide Combine.
+TaskLoom contains the asynchronous utilities extracted from SwiftLibs. Its operation types are lazy: configuration creates a value, and execution starts the work. Combine conveniences are available only on platforms that provide Combine.
 
 ## Topics
 
@@ -26,6 +26,7 @@ TaskLoom contains the asynchronous utilities extracted from SwiftLibs. Its opera
 - ``AsyncSemaphore``
 - ``LatestTask``
 - ``SingleFlight``
+- ``AsyncOperationSerialQueue``
 - ``OperationTraceRecorder``
 - ``OperationTraceEvent``
 - ``OperationTraceSnapshot``

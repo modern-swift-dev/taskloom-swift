@@ -37,4 +37,4 @@ The operation is lazy. `map` transforms its result, and `execute` starts it. Use
 
 ## Choose the next guide
 
-Learn about [retry and timeout ordering](/docs/taskloom-swift/api/taskloom/documentation/taskloom/cancellationandretries/), or explore [task ownership and lifetimes](/docs/taskloom-swift/api/taskloom/documentation/taskloom/tasklifetimes/). Combine helpers and the serial queue are available only where Combine can be imported.
+Learn about [retry and timeout ordering](/docs/taskloom-swift/api/taskloom/documentation/taskloom/cancellationandretries/), or explore [task ownership and lifetimes](/docs/taskloom-swift/api/taskloom/documentation/taskloom/tasklifetimes/). Combine helpers are available only where Combine can be imported.

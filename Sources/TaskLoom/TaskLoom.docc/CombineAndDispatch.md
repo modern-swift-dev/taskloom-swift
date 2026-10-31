@@ -4,7 +4,7 @@ Use the platform bridges alongside the portable concurrency APIs.
 
 ## Availability
 
-Combine helpers and `AsyncOperationSerialQueue` are guarded by `canImport(Combine)` and are not available on Linux. Dispatch helpers are guarded by `canImport(Dispatch)`. Keep platform-specific call sites behind matching conditional compilation checks when sharing application code.
+Combine helpers are guarded by `canImport(Combine)` and are not available on Linux. Dispatch helpers are guarded by `canImport(Dispatch)`. Keep platform-specific call sites behind matching conditional compilation checks when sharing application code.
 
 ## Publishers and tasks
 

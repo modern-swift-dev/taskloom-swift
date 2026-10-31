@@ -8,8 +8,10 @@ Keep ownership explicit when creating and retaining asynchronous work.
 
 These helpers create unstructured tasks. Their lifetime is not automatically tied to the calling function or view. Avoid unintended strong captures in long-lived closures. Cancellation cannot forcibly stop a handler that has already begun.
 
-## Serial main-actor work
+## Serial work
 
-On Combine platforms, `AsyncOperationSerialQueue` executes accepted operations one at a time on the main actor. Retain the queue, submit asynchronous handlers, and cancel it when the owner is finished. Cancellation tokens from `enqueueCancellable` must also be retained; releasing an `AnyCancellable` cancels it.
+`AsyncOperationSerialQueue` runs operations one at a time, in the order their `enqueue` calls reach the queue. `enqueue` suspends until the operation has run and returns its value or rethrows its error. For fire-and-forget work, wrap the call in a task: `Task { try await queue.enqueue { ... } }`. Calls made one after another from the same isolation context keep their order; calls from different tasks race.
 
-The queue offers progress counters and `flush()`. Public submission schedules asynchronous sends, so do not assume concurrent submission calls establish a total order based on their call sites. A flush sentinel waits for work ahead of it in the channel. Cancellation can release a flush waiter without completing every submitted operation. The queue is not a background CPU executor and does not interrupt synchronous code inside a running handler.
+Operations are not forced onto the main actor; pass a `@MainActor` closure when the work needs it. If a caller is cancelled before its operation starts, the operation is skipped and the caller throws `CancellationError` right away. If the operation is already running, it is cancelled cooperatively, and the next operation starts only after it returns. `cancelAll()` does both for every caller and leaves the queue usable for later work.
+
+An operation must not enqueue onto the queue that is running it, including from an unstructured `Task` it creates: that call would wait for itself, so it stops with a precondition failure. Enqueuing onto a different queue is fine. The queue does not interrupt synchronous code inside a running operation.
