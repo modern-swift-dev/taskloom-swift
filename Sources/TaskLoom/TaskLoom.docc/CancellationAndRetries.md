@@ -6,7 +6,21 @@ Understand policy ordering and cooperative cancellation before composing work.
 
 Modifiers wrap the operation built so far. `.retry(3).timeout(.seconds(5))` gives the whole sequence a five-second timeout. `.timeout(.seconds(5)).retry(3)` gives each attempt its own timeout. The retry count includes the initial attempt and must be positive.
 
-``BackoffStrategy`` provides constant, linear, exponential, jittered exponential, and custom delays. Exhausted retries throw `AsyncOperationError.maxRetriesExceeded`, preserving the last error. Cancellation is checked before each attempt and before backoff. Cancellation errors never retry. Use `retry(_:backoff:when:)` to select eligible failures; rejected errors propagate unchanged.
+``BackoffStrategy`` provides constant, linear, exponential, jittered exponential, and custom delays. Exhausted retries throw `AsyncOperationError.maxRetriesExceeded`, preserving the last error. Cancellation is checked before each attempt and before backoff. Cancellation errors never retry.
+
+Pass a `decide:` closure that returns a ``RetryDecision`` for each failure: `.stop` rethrows the error unchanged, `.retry` waits for the backoff delay, and `.retry(after:)` waits exactly that duration instead, for example a server's `Retry-After`. Delays are slept on the `clock:` you inject, if any. Exhausting every attempt throws `maxRetriesExceeded` whatever the closure returns, and `decide` is never called for cancellation.
+
+```swift
+let user = try await AsyncOperation { try await api.fetchUser(id) }
+    .retry(3, backoff: .exponential(base: .milliseconds(100)), decide: { error in
+        switch error {
+            case let error as RateLimited: .retry(after: error.retryAfter)
+            case is NotFound: .stop
+            default: .retry
+        }
+    })
+    .execute()
+```
 
 ## Cooperative timeouts
 

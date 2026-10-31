@@ -62,7 +62,7 @@ struct CancellationPolicyTests {
         let operation = AsyncOperation<Int> {
             _ = await counter.increment()
             throw Failure.permanent
-        }.retry(4, when: { ($0 as? Failure) == .transient })
+        }.retry(4, decide: { ($0 as? Failure) == .transient ? .retry : .stop })
         do { _ = try await operation.execute(); Issue.record("Expected failure") } catch { #expect((error as? Failure) == .permanent) }
         #expect(await counter.value == 1)
     }
