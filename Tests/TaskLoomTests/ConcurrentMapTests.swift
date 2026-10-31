@@ -106,3 +106,90 @@ struct ConcurrentMapTests {
         #expect(await tracker.started == [0])
     }
 }
+
+struct ConcurrentForEachTests {
+    @Test func visitsEveryElement() async throws {
+        let tracker = ConcurrentMapTracker()
+        try await Array(0 ..< 5).concurrentForEach(maxConcurrency: 2) { value in
+            await tracker.start(value)
+            await tracker.finish()
+        }
+        #expect(await tracker.started.sorted() == [0, 1, 2, 3, 4])
+    }
+
+    @Test func boundsConcurrentBodies() async throws {
+        let started = (0 ..< 4).map { _ in TestSignal() }
+        let release = (0 ..< 4).map { _ in TestSignal() }
+        let tracker = ConcurrentMapTracker()
+        let task = Task {
+            try await Array(0 ..< 4).concurrentForEach(maxConcurrency: 2) { value in
+                await tracker.start(value)
+                await started[value].signal()
+                await release[value].wait()
+                await tracker.finish()
+            }
+        }
+        await started[0].wait()
+        await started[1].wait()
+        #expect(await tracker.started.sorted() == [0, 1])
+        await release[1].signal()
+        await started[2].wait()
+        await release[2].signal()
+        await started[3].wait()
+        await release[3].signal()
+        await release[0].signal()
+        try await task.value
+        #expect(await tracker.maximum == 2)
+    }
+
+    @Test func failureCancelsSiblingAndStopsScheduling() async {
+        enum Failure: Error { case expected }
+        let siblingStarted = TestSignal()
+        let siblingCancelled = TestSignal()
+        let tracker = ConcurrentMapTracker()
+        do {
+            try await Array(0 ..< 10).concurrentForEach(maxConcurrency: 2) { value in
+                await tracker.start(value)
+                if value == 0 {
+                    await siblingStarted.wait()
+                    throw Failure.expected
+                }
+                await siblingStarted.signal()
+                do {
+                    try await Task.sleep(for: .seconds(3600))
+                } catch {
+                    await siblingCancelled.signal()
+                    throw error
+                }
+            }
+            Issue.record("Expected body failure")
+        } catch {
+            #expect(error is Failure)
+        }
+        await siblingCancelled.wait()
+        #expect(await tracker.started.sorted() == [0, 1])
+    }
+
+    @Test func cancellationDoesNotScheduleMoreWork() async {
+        let started = TestSignal()
+        let release = TestSignal()
+        let tracker = ConcurrentMapTracker()
+        let task = Task {
+            try await Array(0 ..< 5).concurrentForEach(maxConcurrency: 1) { value in
+                await tracker.start(value)
+                await started.signal()
+                await release.wait() // Intentionally ignores cancellation.
+            }
+        }
+        await started.wait()
+        task.cancel()
+        await release.signal()
+        do {
+            try await task.value
+            Issue.record("Expected cancellation")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(await tracker.started == [0])
+    }
+}

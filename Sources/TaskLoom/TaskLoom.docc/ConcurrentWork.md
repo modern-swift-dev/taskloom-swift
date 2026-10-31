@@ -12,6 +12,8 @@ let thumbnails = try await photos.concurrentMap(maxConcurrency: 4) {
 
 The limit must be positive. The result preserves input order, including optional values, while at most four child tasks execute transforms. Failure cancels remaining children; parent cancellation stops further scheduling. Structured concurrency still waits for children to finish, so transforms must cooperate with cancellation.
 
+When each element only performs work and produces no result, use `concurrentForEach(maxConcurrency:_:)`. It applies the same limit, failure, and cancellation rules without collecting outputs.
+
 ## Deliver only the latest request
 
 Keep a `LatestTask` coordinator on the main actor:
