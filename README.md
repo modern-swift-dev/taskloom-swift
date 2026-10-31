@@ -66,6 +66,8 @@ The existing async utility names are preserved. TaskLoom also includes the
 `Notification.Name` posting and publisher helpers previously in `SLFoundation`;
 avoid importing both modules for those overlapping extensions.
 
+`Publisher.single()` was removed. Use `for try await value in publisher.values { ... }`, or `for await value in publisher.values { ... }` when `Failure == Never`.
+
 TaskLoom has no SwiftLibs dependency. Diagnostics use SwiftLog with the
 `TaskLoom` label and the host application's logging backend. Creation timestamps
 use the local wall clock; elapsed durations use `ContinuousClock` and no longer
@@ -76,8 +78,6 @@ depend on SwiftLibs' synchronized clock.
 The [central documentation repository](https://github.com/modern-swift-dev/docs) owns Astro, the shared theme, and website/API generation. It builds from `main` daily and on manual runs. Edit page Markdown in `Documentation/Site/` and keep DocC catalogs beside the module sources. See the [docs README](https://github.com/modern-swift-dev/docs/blob/main/README.md) for local build and preview commands. Do not commit generated HTML to this repository.
 
 Read the [DocC guides](Sources/TaskLoom/TaskLoom.docc/TaskLoom.md). `make documentation` creates `.build/documentation/TaskLoom-Documentation.zip` for Xcode and releases.
-
-The inherited `Publisher.single()` helper currently only reliably supports synchronous emission; it does not safely manage a long-lived subscription, empty completion, or task cancellation. Prefer another bridge for asynchronous publishers until that API is revised.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for validation commands and contribution guidelines.
 
