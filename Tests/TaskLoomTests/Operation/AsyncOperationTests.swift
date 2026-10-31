@@ -94,10 +94,10 @@ private struct TestError: Error, Equatable {
             .execute()
             Issue.record("Expected timeout error")
         } catch let error as AsyncOperationError {
-            if case .timeout = error {
+            if case .timedOut = error {
                 // Expected
             } else {
-                Issue.record("Expected timeout error, got \(error)")
+                Issue.record("Expected timedOut error, got \(error)")
             }
         } catch {
             Issue.record("Unexpected error type: \(error)")

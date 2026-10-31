@@ -44,8 +44,8 @@ struct OperationClockTests {
         try await clock.waitUntilSleeping(count: 2)
         clock.advance(by: .seconds(5))
         do { _ = try await task.value; Issue.record("Expected timeout") } catch {
-            if case let .timeout(duration) = error as? AsyncOperationError {
-                #expect(duration == .seconds(5))
+            if case .timedOut = error as? AsyncOperationError {
+                // Expected
             } else {
                 Issue.record("Expected timeout, got \(error)")
             }

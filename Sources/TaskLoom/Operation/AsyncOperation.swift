@@ -48,9 +48,11 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
     /// Adds a timeout to the operation.
     ///
     /// If the operation does not complete within the specified duration,
-    /// it will be cancelled and an `AsyncOperationError.timeout` will be thrown.
+    /// it will be cancelled and `AsyncOperationError.timedOut` will be thrown.
     /// Cancellation is cooperative: this method waits for the operation to finish
     /// cancelling, so an operation that ignores cancellation can exceed the timeout.
+    ///
+    /// The duration is measured from the start of each execution.
     ///
     /// - Parameter duration: The maximum time to wait for the operation to complete.
     /// - Returns: A new operation with timeout applied.
@@ -62,14 +64,42 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
     public func timeout<C: Clock>(_ duration: Duration, clock: C) -> AsyncOperation<Success>
         where C.Duration == Duration {
         AsyncOperation {
-            try await withThrowingTaskGroup(of: Success.self) { group in
+            try await self.timeout(until: clock.now.advanced(by: duration), clock: clock).execute()
+        }
+    }
+
+    /// Adds an absolute deadline to the operation.
+    ///
+    /// If the operation does not complete before the deadline, it will be cancelled and
+    /// `AsyncOperationError.timedOut` will be thrown. Share one deadline between several
+    /// steps to give them a single cut-off. A deadline that has already passed times out
+    /// immediately, without starting the operation. As with ``timeout(_:)``, cancellation
+    /// is cooperative: an operation that ignores cancellation can exceed the deadline.
+    ///
+    /// - Parameter deadline: The instant on the continuous clock by which the operation must complete.
+    /// - Returns: A new operation with the deadline applied.
+    public func timeout(until deadline: ContinuousClock.Instant) -> AsyncOperation<Success> {
+        timeout(until: deadline, clock: ContinuousClock())
+    }
+
+    /// Adds an absolute deadline measured by the supplied clock.
+    ///
+    /// See ``timeout(until:)`` for the semantics.
+    public func timeout<C: Clock>(until deadline: C.Instant, clock: C) -> AsyncOperation<Success> {
+        AsyncOperation {
+            try Task.checkCancellation()
+            guard clock.now < deadline else {
+                throw AsyncOperationError.timedOut
+            }
+
+            return try await withThrowingTaskGroup(of: Success.self) { group in
                 group.addTask {
                     try await self.operation()
                 }
 
                 group.addTask {
-                    try await clock.sleep(for: duration)
-                    throw AsyncOperationError.timeout(duration)
+                    try await clock.sleep(until: deadline, tolerance: nil)
+                    throw AsyncOperationError.timedOut
                 }
 
                 guard let result = try await group.next() else {
