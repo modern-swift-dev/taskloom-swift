@@ -4,7 +4,7 @@ TaskLoom is preparing its first public release. Bug reports should include the S
 
 ## Development
 
-Use Swift 6.3 or newer, as specified in `Package.swift`. Apple-only Combine and serial-queue APIs need an Apple SDK. Linux validates the portable concurrency and Dispatch surface.
+Use Swift 6.3 or newer, as specified in `Package.swift`. Apple-only Combine APIs need an Apple SDK. Linux validates the portable concurrency, serial-queue, and Dispatch surface.
 
 ```sh
 swift build
