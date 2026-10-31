@@ -25,11 +25,15 @@ _Avoid_: outcome
 ### Coordination
 
 **Permit**:
-The right to proceed, granted by a semaphore or rate limiter and held while the limited work runs.
+The right to proceed, granted by a semaphore, held while the limited work runs, and then returned.
 _Avoid_: lock, slot, ticket
 
+**Token**:
+One unit of a rate limiter's allowance, taken before limited work starts and never returned; the limiter refills tokens over time.
+_Avoid_: permit
+
 **Waiter**:
-A caller suspended until it receives a permit, its turn on a serial queue, or a shared flight's result.
+A caller suspended until it receives a permit, a token, its turn on a serial queue, or a shared flight's result.
 _Avoid_: subscriber, listener
 
 **Flight**:
