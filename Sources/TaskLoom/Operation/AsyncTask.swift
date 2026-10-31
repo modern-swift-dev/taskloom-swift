@@ -55,13 +55,43 @@ public struct AsyncTask<Success: Sendable>: Sendable {
         default defaultValue: Success
     ) -> AsyncTask<Success> where C.Duration == Duration {
         AsyncTask {
-            await withTaskGroup(of: Success?.self) { group in
+            await self.timeout(until: clock.now.advanced(by: duration), clock: clock, default: defaultValue).execute()
+        }
+    }
+
+    /// Adds an absolute deadline to the task with a default value.
+    ///
+    /// If the task does not complete before the deadline, it will be cancelled and the default
+    /// value will be returned. A deadline that has already passed returns the default value
+    /// without starting the task.
+    ///
+    /// - Parameters:
+    ///   - deadline: The instant on the continuous clock by which the task must complete.
+    ///   - defaultValue: The value to return if the deadline is reached.
+    /// - Returns: A new task with the deadline applied.
+    public func timeout(until deadline: ContinuousClock.Instant, default defaultValue: Success) -> AsyncTask<Success> {
+        timeout(until: deadline, clock: ContinuousClock(), default: defaultValue)
+    }
+
+    /// Adds an absolute deadline measured by the supplied clock. Cancellation is cooperative:
+    /// this still waits for the task to finish after cancelling it.
+    public func timeout<C: Clock>(
+        until deadline: C.Instant,
+        clock: C,
+        default defaultValue: Success
+    ) -> AsyncTask<Success> {
+        AsyncTask {
+            guard clock.now < deadline else {
+                return defaultValue
+            }
+
+            return await withTaskGroup(of: Success?.self) { group in
                 group.addTask {
                     await self.task()
                 }
 
                 group.addTask {
-                    try? await clock.sleep(for: duration)
+                    try? await clock.sleep(until: deadline, tolerance: nil)
                     return nil
                 }
 

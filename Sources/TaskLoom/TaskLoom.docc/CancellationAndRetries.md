@@ -26,7 +26,17 @@ let user = try await AsyncOperation { try await api.fetchUser(id) }
 
 Timeouts race work against a sleeping child task. The losing child is cancelled, but the task group must wait for every child to exit. A timeout is therefore a cancellation request, not a guarantee that the function returns at a wall-clock deadline. Use cancellation-aware suspension points and `Task.checkCancellation()` in long-running work.
 
-``AsyncTask`` expresses timeouts with a default value. It cannot throw `CancellationError` to its caller. Converting an operation with `toTask(default:)` also turns all errors, including cancellation, into the supplied default.
+A timed-out operation throws `AsyncOperationError.timedOut`, whether the timeout was a duration or a deadline. `timeout(_:)` measures its duration from the start of each execution. `timeout(until:)` takes an absolute deadline instead, so several steps can share one cut-off:
+
+```swift
+let deadline = ContinuousClock.now + .seconds(10)
+let user = try await fetchUser.timeout(until: deadline).execute()
+let posts = try await fetchPosts(user).timeout(until: deadline).execute()
+```
+
+A deadline that has already passed times out immediately, without starting the work.
+
+``AsyncTask`` expresses timeouts with a default value. It also accepts a deadline with `timeout(until:default:)`. It cannot throw `CancellationError` to its caller. Converting an operation with `toTask(default:)` also turns all errors, including cancellation, into the supplied default.
 
 ## Races and fallback
 

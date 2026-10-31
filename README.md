@@ -51,7 +51,7 @@ The concurrency utilities support Apple platforms and Linux. Combine APIs, cance
 
 ## Cancellation and execution semantics
 
-Cancellation is cooperative. Timeouts and races cancel losing child tasks, but structured task groups still wait for those children to finish. A closure that ignores cancellation can delay return beyond the configured timeout.
+Cancellation is cooperative. Timeouts and races cancel losing child tasks, but structured task groups still wait for those children to finish. A closure that ignores cancellation can delay return beyond the configured timeout. A timed-out operation throws `AsyncOperationError.timedOut`; use `timeout(until:)` with an absolute deadline to give several steps one shared cut-off.
 
 `AsyncOperation.race` selects the first completion, including a failure; `firstSuccess` ignores failures and throws `AsyncOperationError.allFailed` only if every operation fails. `all` preserves input order and throws on failure; `allSettled` retains one `Result` per input, including failures, and propagates parent cancellation. `fallback` and `recover` propagate cancellation instead of recovering from it.
 
