@@ -6,4 +6,6 @@ All notable changes to TaskLoom are documented here. Before 1.0, minor releases 
 
 ### Breaking
 
+- Removed the unused `swift-async-algorithms` and `swift-collections` dependencies. If you relied on them transitively, add them to your own package.
+
 ### Added

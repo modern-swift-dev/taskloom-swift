@@ -16,8 +16,6 @@ let package = Package(
         .library(name: "TaskLoomTesting", targets: ["TaskLoomTesting"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.1"),
-        .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.4"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.4"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", exact: "1.5.0")
     ],
@@ -25,8 +23,6 @@ let package = Package(
         .target(
             name: "TaskLoom",
             dependencies: [
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-                .product(name: "OrderedCollections", package: "swift-collections"),
                 .product(name: "Logging", package: "swift-log")
             ],
             swiftSettings: [
