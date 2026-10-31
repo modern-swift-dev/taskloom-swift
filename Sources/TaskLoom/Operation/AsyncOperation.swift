@@ -228,6 +228,20 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
         }
     }
 
+    /// Limits how often the operation starts using a rate limiter.
+    ///
+    /// Each execution takes one token from the limiter before running, waiting in line if none is available.
+    /// Tokens are consumed, not returned, so the limit applies to starts rather than to concurrent work.
+    ///
+    /// - Parameter limiter: The rate limiter to take a token from.
+    /// - Returns: A new operation that takes a token before executing.
+    public func limited(by limiter: RateLimiter) -> AsyncOperation<Success> {
+        AsyncOperation {
+            try await limiter.acquireForLimitedWork()
+            return try await self.operation()
+        }
+    }
+
     // MARK: - Lifecycle Hooks
 
     /// Adds a callback that executes when the operation succeeds.

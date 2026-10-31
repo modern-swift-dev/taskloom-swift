@@ -121,6 +121,18 @@ public struct AsyncTask<Success: Sendable>: Sendable {
         }
     }
 
+    /// Limits how often the task starts using a rate limiter.
+    ///
+    /// - Parameter limiter: The rate limiter to take a token from.
+    /// - Returns: A throwing operation that takes a token before executing.
+    /// Cancellation while waiting for a token throws; the task body remains nonthrowing.
+    public func limited(by limiter: RateLimiter) -> AsyncOperation<Success> {
+        AsyncOperation {
+            try await limiter.acquireForLimitedWork()
+            return await self.task()
+        }
+    }
+
     // MARK: - Lifecycle Hooks
 
     /// Adds a callback that executes when the task completes.

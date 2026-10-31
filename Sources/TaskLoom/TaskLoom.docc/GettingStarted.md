@@ -29,4 +29,18 @@ Use `map` to transform a result and `flatMap` to select subsequent work. `all` r
 
 Share an ``AsyncSemaphore`` between operations and apply `limited(by:)` to each one. This bounds simultaneous work; it is not a requests-per-second rate limiter. Choose a positive permit count and keep the protected work asynchronous so waiting does not block a thread. Both `wait()` and `withPermit` throw when cancelled. Cancelled waiters leave the queue without consuming a permit. Applying `limited(by:)` to a nonthrowing `AsyncTask` returns an `AsyncOperation` because permit acquisition can throw.
 
+## Limit request rate
+
+Share a ``RateLimiter`` to cap how often work starts, such as ten requests per second:
+
+```swift
+let limiter = RateLimiter(rate: 10, per: .seconds(1), burst: 10)
+
+let user = try await AsyncOperation { try await api.fetchUser(id) }
+    .limited(by: limiter)
+    .execute()
+```
+
+The limiter is a token bucket. It starts full with `burst` tokens, refills continuously at `rate / period`, and never holds more than `burst`. Each execution takes one token with `acquire()`, waiting when none is available. Tokens are consumed rather than released, so a rate limiter bounds starts, not simultaneous work; combine it with an ``AsyncSemaphore`` when you need both. Waiters are served in arrival order, and a later caller never takes a token ahead of an earlier waiter. A cancelled waiter throws `CancellationError` without consuming a token. Inject a clock with `init(rate:per:burst:clock:)`, for example `ManualClock` in tests. As with the semaphore, applying `limited(by:)` to an `AsyncTask` returns an `AsyncOperation`, and traced operations report the wait as `waitingForPermit`.
+
 See <doc:CancellationAndRetries> before composing timeout, retry, race, and fallback policies.
