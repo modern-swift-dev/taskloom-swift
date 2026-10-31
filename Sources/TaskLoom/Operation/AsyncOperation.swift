@@ -73,7 +73,7 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
                 }
 
                 guard let result = try await group.next() else {
-                    throw AsyncOperationError.cancelled
+                    preconditionFailure("Timeout always adds two child tasks, so next() cannot return nil")
                 }
 
                 group.cancelAll()
@@ -118,7 +118,7 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
                     return try await self.operation()
                 } catch {
                     try Task.checkCancellation()
-                    if error is CancellationError || (error as? AsyncOperationError) == .cancelled {
+                    if error is CancellationError {
                         throw error
                     }
                     guard shouldRetry(error) else {
@@ -172,7 +172,7 @@ public struct AsyncOperation<Success: Sendable>: Sendable {
                 return try await self.operation()
             } catch {
                 try Task.checkCancellation()
-                if error is CancellationError || (error as? AsyncOperationError) == .cancelled {
+                if error is CancellationError {
                     throw error
                 }
                 return try await handler(error)
@@ -336,7 +336,7 @@ public extension AsyncOperation {
                 }
 
                 guard let result = try await group.next() else {
-                    throw AsyncOperationError.cancelled
+                    preconditionFailure("Race requires a non-empty operation list, so next() cannot return nil")
                 }
 
                 group.cancelAll()

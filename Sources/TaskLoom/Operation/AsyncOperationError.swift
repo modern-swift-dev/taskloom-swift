@@ -6,8 +6,6 @@ public enum AsyncOperationError: Error, Sendable, Equatable {
     case timeout(Duration)
     /// The operation failed after exhausting all retry attempts.
     case maxRetriesExceeded(attempts: Int, lastError: any Error)
-    /// The operation was cancelled.
-    case cancelled
 
     public static func == (lhs: AsyncOperationError, rhs: AsyncOperationError) -> Bool {
         switch (lhs, rhs) {
@@ -15,8 +13,6 @@ public enum AsyncOperationError: Error, Sendable, Equatable {
                 lhsDuration == rhsDuration
             case let (.maxRetriesExceeded(lhsAttempts, _), .maxRetriesExceeded(rhsAttempts, _)):
                 lhsAttempts == rhsAttempts
-            case (.cancelled, .cancelled):
-                true
             default:
                 false
         }
@@ -30,8 +26,6 @@ extension AsyncOperationError: LocalizedError {
                 "Operation timed out after \(duration)"
             case let .maxRetriesExceeded(attempts, lastError):
                 "Operation failed after \(attempts) attempts. Last error: \(lastError.localizedDescription)"
-            case .cancelled:
-                "Operation was cancelled"
         }
     }
 }
