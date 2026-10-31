@@ -25,6 +25,7 @@ TaskLoom contains the asynchronous utilities extracted from SwiftLibs. Its opera
 - ``BackoffStrategy``
 - ``AsyncSemaphore``
 - ``LatestTask``
+- ``SingleFlight``
 - ``OperationTraceRecorder``
 - ``OperationTraceEvent``
 - ``OperationTraceSnapshot``
