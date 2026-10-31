@@ -1,22 +1,11 @@
 import Foundation
 
 /// Errors that can occur during async operation execution.
-public enum AsyncOperationError: Error, Sendable, Equatable {
+public enum AsyncOperationError: Error, Sendable {
     /// The operation exceeded the specified timeout duration.
     case timeout(Duration)
     /// The operation failed after exhausting all retry attempts.
     case maxRetriesExceeded(attempts: Int, lastError: any Error)
-
-    public static func == (lhs: AsyncOperationError, rhs: AsyncOperationError) -> Bool {
-        switch (lhs, rhs) {
-            case let (.timeout(lhsDuration), .timeout(rhsDuration)):
-                lhsDuration == rhsDuration
-            case let (.maxRetriesExceeded(lhsAttempts, _), .maxRetriesExceeded(rhsAttempts, _)):
-                lhsAttempts == rhsAttempts
-            default:
-                false
-        }
-    }
 }
 
 extension AsyncOperationError: LocalizedError {
